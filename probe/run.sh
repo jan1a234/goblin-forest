@@ -18,6 +18,7 @@ while IFS= read -r line; do
   case "$cmd" in
     grep) grep -E "$rest" classes.txt | head -80;;
     javap) if [ -n "$re" ]; then javap -protected -cp "$CP" "$cls" 2>&1 | grep -E "$re"; else javap -protected -cp "$CP" "$cls" 2>&1 | grep -v '^Compiled from'; fi;;
+    sh) bash -c "$rest" 2>&1 | head -150;;
     src) f="src-x/${cls//.//}.java"; if [ -f "$f" ]; then if [ -n "$re" ]; then grep -nE "$re" "$f"; else cat -n "$f"; fi; else echo "keine Quelle: $f"; fi;;
   esac
 done < probe/cmds.txt

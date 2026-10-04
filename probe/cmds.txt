@@ -1,78 +1,94 @@
-grep ^net/fabricmc/fabric/api/(client/)?gametest/
-grep ^net/minecraft/world/entity/EntityTypes$
-grep ^net/minecraft/client/renderer/entity/layers/(HumanoidArmorLayer|CustomHeadLayer)
-grep ^net/minecraft/world/level/block/LeavesBlock$
-grep ^net/minecraft/core/component/DataComponentType
-grep ^net/minecraft/world/level/dimension/
-grep ^net/minecraft/world/level/levelgen/flat/
-javap net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
-javap net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
-javap net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents$EndTick
-javap net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry
-javap net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
-javap net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement
-javap net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements
-javap net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
+javap net.minecraft.world.entity.Mob (xpReward|ExperienceReward|removeWhenFarAway|requiresCustomPersistence|checkDespawn|getAmbientSound|playAmbientSound|getMainArm|setLeftHanded|finalizeSpawn|setCanPickUpLoot|setDropChance|serverAiStep|customServerAiStep|isPushable|isSunBurnTick|doHurtTarget|getMeleeAttackRangeSqr|getAttackBoundingBox|isWithinMeleeAttackRange|tick\(|aiStep|setPersistence|shouldDespawnInPeaceful)
+javap net.minecraft.world.entity.LivingEntity (hurtServer|void die|actuallyHurt|getHurtSound|getDeathSound|tickDeath|yBodyRot|yHeadRot|knockback|isInvisible|hurtTime|shouldDropExperience|getExperienceReward|dropExperience|setLastHurtByMob|removeAllEffects|removeEffect|hasEffect|getAttributeValue|canAttack|causeFallDamage|deathTime|isDeadOrDying|swing|getArmorValue|isBlocking|dropAllDeathLoot|shouldDropLoot|getLastHurtByMob|getKillCredit|lastHurtByPlayer|setSprinting|getSpeed|setSpeed|jumpFromGround|travel|onEquipItem|getItemBySlot)
+javap net.minecraft.world.entity.Entity (setCustomName|hasCustomName|getScoreboardName|getTeam|isAlliedTo|setGlowingTag|tickCount|getBbWidth|getBbHeight|setDeltaMovement|getDeltaMovement|hurtMarked|isInWater|isInvisibleTo|getName\(|getDisplayName|isRemoved|onGround|resetFallDistance|setPos\(|getId\(|getType|is\(|position\(|isInvulnerableTo|isSpectator|getYRot|setYRot|setXRot|getXRot|yRotO|lookAt|getEyeY|isOnFire|clearFire|setRemainingFireTicks|addDeltaMovement|isShiftKeyDown|getForward|getRandom|level\(|kill\(|remove\(|getRemovalReason|setOldPosAndRot|getBoundingBox|distanceTo)
+javap net.minecraft.world.entity.projectile.Projectile (canHitEntity|onHitEntity|onHit|ownedBy)
+javap net.minecraft.world.entity.projectile.arrow.Arrow
+javap net.minecraft.world.entity.projectile.arrow.AbstractArrow (protected|onHitEntity|getDefaultPickupItem|setPierceLevel|inGround|isInGround|baseDamage)
+javap net.minecraft.world.level.block.Block (updateFromNeighbourShapes|defaultBlockState|UPDATE_)
+javap net.minecraft.world.level.storage.ValueInput
+javap net.minecraft.world.level.storage.ValueInput$TypedInputList
+javap net.minecraft.world.level.storage.TagValueInput (static)
+javap net.minecraft.util.ProblemReporter (static|DISCARDING)
+javap net.minecraft.world.ItemStackWithSlot (static|public)
+javap net.minecraft.world.item.Items (HEAVY_CORE|MACE;|RED_BANNER|GREEN_BANNER|LIME_BANNER|IRON_AXE|FIRE_CHARGE|RED_MUSHROOM;|BLAZE_POWDER|COMPASS;|LEATHER_|IRON_HELMET|GOLDEN_HELMET|BOW;|ARROW;|WOODEN_SWORD|STONE_SWORD|IRON_SWORD|STONE_AXE|GOLDEN_AXE|SHIELD;|WOODEN_AXE|GOAT_HORN|BELL;|WHITE_BANNER|CLOCK;|RECOVERY_COMPASS|SPYGLASS)
+javap net.minecraft.client.gui.components.Button$Builder
+javap net.minecraft.client.gui.components.Button$OnPress
+javap net.minecraft.client.gui.components.Tooltip (static)
+javap net.minecraft.client.gui.components.AbstractWidget (public|protected) 
+javap net.minecraft.client.input.KeyEvent
+javap net.minecraft.client.input.MouseButtonEvent
+src net.minecraft.client.KeyMapping (Category|category|record|translat)
+javap net.minecraft.server.level.ServerPlayer (teleport|setGameMode|gameMode|setCamera|restoreFrom|isChangingDimension|hasDisconnected|lastSentExp|onUpdateAbilities|setExperience|giveExperience|resetSentInfo|serverLevel|level\(|getRespawnConfig|setRespawnPosition|isAlive|setLastDeathLocation|getTabListDisplayName|refreshTabListName|getCamera|initMenu)
+javap net.minecraft.server.level.ServerPlayerGameMode (getGameModeForPlayer|changeGameModeForPlayer|isSurvival|isCreative)
+javap net.minecraft.world.level.portal.TeleportTransition (public)
+javap net.minecraft.network.FriendlyByteBuf (writeVarInt|readVarInt|writeUtf|readUtf|writeEnum|readEnum|writeDouble|readDouble|writeFloat|readFloat|writeBoolean|readBoolean|writeVarLong|readVarLong|writeInt\(|readInt\(|writeByte|readByte|writeUUID|readUUID)
+javap net.minecraft.network.RegistryFriendlyByteBuf (public)
+javap net.minecraft.network.protocol.common.custom.CustomPacketPayload
+javap net.minecraft.network.protocol.common.custom.CustomPacketPayload$Type
+javap net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking (static)
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking$Context
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking$PlayPayloadHandler
+javap net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking (static)
+javap net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking$Context
+javap net.minecraft.world.scores.Team$Visibility (static final)
+javap net.minecraft.world.scores.Team$CollisionRule (static final)
+javap net.minecraft.world.effect.MobEffectInstance (public net)
+javap net.minecraft.world.effect.MobEffects (NIGHT_VISION|INVISIBILITY|GLOWING|SLOWNESS|JUMP_BOOST|RESISTANCE|WEAKNESS|SPEED;|STRENGTH|REGENERATION|SATURATION)
+javap net.minecraft.world.item.component.DyedItemColor (public)
+javap net.minecraft.world.item.component.ItemAttributeModifiers (static)
+javap net.minecraft.world.item.component.TooltipDisplay (public)
+javap net.minecraft.util.Unit (static)
+grep ^net/fabricmc/fabric/api/gametest/
+javap net.fabricmc.fabric.api.gametest.v1.GameTest
+javap net.minecraft.gametest.framework.GameTestHelper (public [a-zA-Z.<>?]+ (getLevel|spawn|succeed|fail|assertTrue|runAfterDelay|runAtTickTime|onEachTick|succeedWhen|absolutePos|getTick|startSequence|makeMockPlayer|makeMockServerPlayer)|absoluteVec)
+grep ^net/minecraft/gametest/framework/(GameTestAssertException|TestFunction|GameTestHelper|GameTestInstance|FunctionGameTestInstance|TestData)
+sh find $HOME/.gradle -name 'fabric-loom*.jar' | head; for j in $(find $HOME/.gradle -name 'fabric-loom*.jar' | head -3); do unzip -Z1 $j | grep -iE 'gametest|FabricApiExtension|TestSettings' ; done
+sh j=$(find $HOME/.gradle -name 'fabric-loom*.jar' | grep -v sources | head -1); mkdir -p /tmp/loomx && cd /tmp/loomx && unzip -qo $j && for c in $(find . -iname '*GameTestSettings*.class' -o -iname 'FabricApiExtension.class' -o -iname '*FabricApiTesting*.class' | head -5); do javap -cp . ${c%.class}; done
+javap net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
+javap net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
+javap net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldBuilder
+javap net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext
+javap net.fabricmc.fabric.api.client.gametest.v1.context.TestClientWorldContext
+javap net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
+javap net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions (static|public)
+javap net.fabricmc.fabric.api.client.gametest.v1.TestInput
+javap net.minecraft.client.Options (keyAttack|keyUse|getCameraType|setCameraType|hideGui|keyInventory|keySwapOffhand|keyDrop)
+javap net.minecraft.client.Minecraft (public [a-zA-Z.<>]+ (player|level|options|gui|font|hitResult|screen|getWindow|isPaused|getConnection|getCameraEntity|cameraEntity|getInstance|setScreenAndShow|getSoundManager)|player;|level;|options;|font;|hitResult;|gui;)
+javap net.minecraft.client.renderer.entity.state.HumanoidRenderState
+javap net.minecraft.client.renderer.entity.state.LivingEntityRenderState
+src net.minecraft.client.model.monster.piglin.PiglinModel
+grep ^net/minecraft/client/model/geom/ModelLayers$
+javap net.minecraft.client.model.geom.ModelLayers (PIGLIN)
+javap net.minecraft.client.renderer.entity.EntityRendererProvider$Context (public)
+javap net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents$AllowDamage
+javap net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents$AllowDeath
+javap net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents$AfterDeath
+javap net.fabricmc.fabric.api.event.player.UseItemCallback
+javap net.fabricmc.fabric.api.event.player.UseBlockCallback
+javap net.fabricmc.fabric.api.event.player.AttackEntityCallback
+javap net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents$Before
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents$Join
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents$Disconnect
 javap net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents$Disconnect
-javap net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents$Join
-javap net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents
-javap net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents$Load
-javap net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents$EndTick
-javap net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$ServerStarted
-javap net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents$ServerStopping
-javap net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents$Join
-javap net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents$Leave
-javap net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents$AfterRespawn
-javap net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents$AllowDeath
-javap net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
-javap net.minecraft.client.gui.Gui (public|Screen|screen)
-javap net.minecraft.client.renderer.entity.state.PiglinRenderState
-javap net.minecraft.world.entity.monster.piglin.PiglinArmPose
-javap net.minecraft.client.model.monster.piglin.AdultPiglinModel
-javap net.minecraft.client.model.monster.piglin.BabyPiglinModel
-javap net.minecraft.client.model.monster.piglin.PiglinModel
-javap net.minecraft.client.model.monster.piglin.AbstractPiglinModel
-javap net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer (public)
-javap net.minecraft.client.renderer.entity.layers.CustomHeadLayer$Transforms (public)
-javap net.minecraft.client.renderer.entity.EntityRendererProvider
-javap net.minecraft.client.renderer.entity.EntityRenderer (protected|public)
-javap net.minecraft.client.renderer.entity.state.EntityRenderState
-javap net.minecraft.world.entity.EntityTypes (ARROW|PIGLIN;|SMALL_FIREBALL|LIGHTNING|ITEM;|EXPERIENCE_ORB)
-javap net.minecraft.world.entity.EntityType (public|static)
-javap net.minecraft.world.entity.MobCategory (static final)
-javap net.minecraft.world.entity.EntitySpawnReason (static final)
-javap net.minecraft.world.entity.player.Player (getInventory|getFoodData|getCooldowns|experience|totalExperience|setGameMode|isCreative|isSpectator|getAbilities|onUpdateAbilities|giveExperience|attack\(|resetAttackStrengthTicker|getAttackStrengthScale|containerMenu|inventoryMenu|displayClientMessage|sendOverlay|setRespawn|removeEntitiesOnShoulder)
-javap net.minecraft.world.level.block.LeavesBlock (PERSISTENT|DISTANCE)
-javap net.minecraft.world.level.block.state.StateHolder (setValue|getValue)
-javap net.minecraft.world.level.block.Blocks (GRASS_BLOCK|DIRT;|DIRT_PATH|COARSE_DIRT|STONE_BRICKS|MOSSY_STONE_BRICKS|COBBLESTONE;|MOSSY_COBBLESTONE;|OAK_LOG|OAK_LEAVES|DARK_OAK_LOG|DARK_OAK_LEAVES|SPRUCE_PLANKS|SPRUCE_LOG|SPRUCE_FENCE;|OAK_FENCE;|WATER;|BARRIER|AIR;|RED_WOOL|GREEN_WOOL|LIME_WOOL|LANTERN;|TORCH;|CAMPFIRE;|HAY_BLOCK|POLISHED_BLACKSTONE;|MOSS_BLOCK|MOSS_CARPET|SHORT_GRASS|FERN;|MUD;|PACKED_MUD|MUD_BRICKS;|BEDROCK|GRAVEL|LILY_PAD|SEA_LANTERN|IRON_BARS|RED_CONCRETE;|GREEN_CONCRETE;|STONE;|DEEPSLATE_BRICKS;|CRACKED_STONE_BRICKS|CHISELED_STONE_BRICKS|STONE_BRICK_WALL|COBBLESTONE_WALL|RED_BANNER|GREEN_BANNER|LIME_BANNER|SPRUCE_SLAB|STONE_BRICK_STAIRS|SKELETON_SKULL|RED_STAINED_GLASS;|GREEN_STAINED_GLASS;|GLOWSTONE|SHROOMLIGHT|BROWN_MUSHROOM;|RED_MUSHROOM;|TALL_GRASS|ROOTED_DIRT|PODZOL|DARK_OAK_PLANKS;|DARK_OAK_FENCE;|SPRUCE_LEAVES|AZALEA_LEAVES|COBWEB|RED_CARPET|GREEN_CARPET|LIME_CARPET|CHAIN|IRON_CHAIN)
-javap net.minecraft.nbt.CompoundTag (public)
-javap net.minecraft.core.component.DataComponentType$Builder
-javap net.minecraft.core.component.DataComponentType (static)
-javap net.minecraft.world.level.LevelReader (getChunk|getHeight|isLoaded)
-javap net.minecraft.world.level.EntityGetter (getEntitiesOfClass|getNearestPlayer|players)
-javap net.minecraft.world.level.LevelAccessor (getGameTime|getLevelData)
-javap net.minecraft.world.level.LevelTimeAccess
-javap net.minecraft.world.phys.Vec3 (public)
-javap net.minecraft.world.phys.AABB (public)
-javap net.minecraft.core.BlockPos (public static|public net.minecraft.core.BlockPos (above|below|offset|containing|relative)|MutableBlockPos|public BlockPos)
-javap net.minecraft.core.BlockPos$MutableBlockPos (set\()
-javap net.minecraft.util.Mth (clamp|floor|lerp|sqrt|wrapDegrees|atan2|cos|sin)
-javap net.minecraft.world.entity.ai.goal.GoalSelector (addGoal|removeAllGoals)
-javap net.minecraft.world.entity.ai.goal.FloatGoal (public)
-javap net.minecraft.world.item.equipment.Equippable (static|public)
-javap net.minecraft.server.MinecraftServer (halt|stopServer|isRunning|getScoreboard|getCommands|createCommandSourceStack|close|isStopped)
-javap net.minecraft.world.entity.LivingEntity (setHealth|heal|getMaxHealth)
-javap net.minecraft.world.InteractionHand (static final)
-javap net.minecraft.world.entity.EquipmentSlot (static final)
-javap net.minecraft.world.scores.TeamColor (static final)
-javap net.minecraft.ChatFormatting (static final)
-javap net.minecraft.network.chat.TextColor (static)
-javap net.minecraft.world.entity.player.Abilities (public)
-javap net.minecraft.server.level.ServerPlayer (connection|send|closeContainer|sendSystemMessage|getRespawnConfig|setRespawnPosition)
-javap net.minecraft.server.network.ServerGamePacketListenerImpl (send\(|player)
-javap net.minecraft.world.item.ItemStack (getOrDefault|get\(|has\(|is\()
-javap net.minecraft.core.component.DataComponentHolder
-javap net.minecraft.world.entity.ai.attributes.AttributeSupplier (public)
-src net.minecraft.client.renderer.entity.state.PiglinRenderState
-src net.minecraft.client.model.monster.piglin.AbstractPiglinModel
-src net.minecraft.client.gui.Gui (extractHearts|extractPlayerHealth|private void extract|public void extract|Hud|hud)
+javap net.minecraft.world.entity.ai.attributes.Attributes (SCALE|FOLLOW_RANGE|STEP_HEIGHT|KNOCKBACK_RESISTANCE|MOVEMENT_SPEED|ATTACK_KNOCKBACK|ARMOR;|SAFE_FALL_DISTANCE|WATER_MOVEMENT|MAX_HEALTH|ATTACK_DAMAGE|ATTACK_SPEED|JUMP_STRENGTH|GRAVITY)
+javap net.minecraft.server.level.ServerLevel (sendParticles|getEntity\(|getEntities\(|setChunkForced|getForceLoadedChunks|players\(|getServer|dimension\(|addFreshEntity|getGameTime|explode)
+javap net.minecraft.world.level.entity.EntityTypeTest (static)
+src net.minecraft.server.level.ServerPlayer (lastSentExp|ClientboundSetExperiencePacket)
+javap net.minecraft.world.level.storage.LevelResource (static)
+javap net.minecraft.network.chat.Component (static)
+javap net.minecraft.network.chat.MutableComponent (public)
+javap net.minecraft.network.chat.Style (public)
+javap net.minecraft.client.model.HumanoidModel$ArmPose (static final)
+javap net.minecraft.world.level.Level (playSound|playLocalSound|damageSources|getBlockState|setBlock|isClientSide|dimension\(|getEntities)
+javap net.minecraft.world.damagesource.DamageSource (getEntity|getDirectEntity|is\(|type)
+javap net.minecraft.world.damagesource.DamageSources (public)
+javap net.minecraft.core.particles.ParticleTypes (DUST|FLAME;|CRIT;|SMOKE;|HEART|HAPPY_VILLAGER|ANGRY_VILLAGER|EXPLOSION|LAVA|SOUL_FIRE|ELECTRIC|ENCHANTED|TOTEM|SWEEP|POOF|CLOUD|COMPOSTER|DAMAGE_INDICATOR|WITCH|FIREWORK|BLOCK;|GLOW;|CAMPFIRE|SPORE|MYCELIUM|CRIMSON|WAX_ON|SCRAPE|END_ROD|NOTE)
+javap net.minecraft.core.particles.DustParticleOptions (public)
+javap net.minecraft.core.particles.BlockParticleOption (public)
+javap net.minecraft.sounds.SoundEvents (ARROW_SHOOT|ARROW_HIT;|BLAZE_SHOOT|FIRECHARGE_USE|PLAYER_LEVELUP|EXPERIENCE_ORB_PICKUP|TOTEM_USE|WITHER_SPAWN|ENDER_DRAGON_GROWL|EVOKER_CAST_SPELL|ILLUSIONER_CAST_SPELL|IRON_GOLEM_ATTACK|ANVIL_LAND|VILLAGER_NO|PIGLIN_ANGRY|PIGLIN_AMBIENT|PIGLIN_HURT|PIGLIN_DEATH|PIGLIN_STEP|GENERIC_EXPLODE|RAID_HORN|UI_BUTTON_CLICK|NOTE_BLOCK_PLING|NOTE_BLOCK_BELL|NOTE_BLOCK_HAT|TRIDENT_THUNDER|GOAT_HORN|PLAYER_ATTACK_STRONG|PLAYER_ATTACK_SWEEP|SHIELD_BLOCK|ZOMBIE_ATTACK_IRON_DOOR|WARDEN_SONIC_BOOM|BEACON_ACTIVATE|BEACON_POWER_SELECT|ENDER_DRAGON_DEATH|UI_TOAST_CHALLENGE_COMPLETE|BELL_BLOCK|BELL_RESONATE|BREWING_STAND_BREW|BOTTLE_FILL|GENERIC_DRINK|AMETHYST_BLOCK_CHIME|STONE_BREAK|WOOD_BREAK)
+javap net.minecraft.sounds.SoundSource (static final)
+javap net.minecraft.server.players.PlayerList (getPlayer|getPlayers|broadcastSystemMessage|broadcastAll)
+javap net.minecraft.world.BossEvent$BossBarColor (static final)
+javap net.minecraft.world.level.block.state.properties.BlockStateProperties (HORIZONTAL_FACING|HALF;|LIT;|HANGING|ROTATION_16|AXIS;|SLAB_TYPE|STAIRS_SHAPE|WATERLOGGED|PERSISTENT|BOTTOM)
+javap net.minecraft.world.level.block.Blocks (RED_CONCRETE|GREEN_CONCRETE|LIME_CONCRETE|RED_WOOL|GREEN_WOOL|LIME_WOOL|RED_BANNER|GREEN_BANNER|RED_TERRACOTTA|GREEN_TERRACOTTA|RED_GLAZED|GREEN_GLAZED|BROWN_MUSHROOM_BLOCK|RED_MUSHROOM_BLOCK|MUSHROOM_STEM|DARK_OAK_STAIRS|SPRUCE_STAIRS|COBBLESTONE_STAIRS|STONE_BRICK_SLAB|COBBLESTONE_SLAB|DARK_OAK_SLAB|SPRUCE_TRAPDOOR|BARREL|TARGET|CRAFTING_TABLE|ANVIL;|SMITHING|FLETCHING|CHEST;|BONE_BLOCK|MAGMA_BLOCK|NETHER_WART_BLOCK|GLOW_LICHEN|VINE;|HANGING_ROOTS|SPORE_BLOSSOM|BIG_DRIPLEAF;|SWEET_BERRY|BROWN_CARPET|DEAD_BUSH|BUSH;|FIREFLY_BUSH|LEAF_LITTER|WILDFLOWERS|POPPY|DANDELION|CORNFLOWER|OXEYE|AZURE)
