@@ -4,7 +4,7 @@ Fabric-Mod für **Minecraft Java 26.2**. 1-gegen-1-PvP auf einem Server, gespiel
 Eigene Variante, inspiriert vom Browser-Strategiespiel *Clan Wars: Goblin Forest* (Flash, 2010).
 
 Dieses Dokument ist die Grundlage für alle weiteren Arbeitsschritte (Mod-Gerüst, Kern-Gameplay, Feinschliff).
-Markierungen: **[MVP]** = nötig für das erste spielbare Match zu zweit, **[Später]** = Ausbaustufe danach.
+Markierungen: **[MVP]** = nötig für das erste spielbare Match zu zweit (v0.1), **[v1.0]** = mit dem Feinschliff umgesetzt, **[Später]** = noch offen.
 
 ---
 
@@ -78,10 +78,10 @@ Alle Einheiten sind eigene Entities (`PathfinderMob`), folgen den Lane-Wegpunkte
 | Krieger | Frontlinie | 40 | 2 | 110 | 10 | Nahkampf | normal | Kann blocken: −30 % Schaden von vorne | [MVP] |
 | Bogenschütze | Fernkampf | 50 | 2 | 60 | 9 | 14 Blöcke | normal | Bleibt hinter der Frontlinie stehen | [MVP] |
 | Assassine | Flankierer | 80 | 3 | 70 | 22 | Nahkampf | schnell | Greift bevorzugt Fernkämpfer und den gegnerischen Spieler an; erster Treffer aus Unsichtbarkeit doppelt | [MVP] |
-| Schamane | Unterstützung | 90 | 3 | 60 | 6 | 10 Blöcke | langsam | Heilt Verbündete in 6 Blöcken um 8 HP/2 s | [Später] |
-| Troll | Tank | 150 | 5 | 400 | 25 | Nahkampf | langsam | Reißt Gegner um, +50 % Schaden gegen Gebäude | [Später] |
-| Wolfsreiter | Kavallerie | 120 | 4 | 160 | 16 | Nahkampf | sehr schnell | Ansturm: erster Treffer mit Rückstoß | [Später] |
-| Katapult | Belagerung | 200 | 5 | 150 | 60 | 22 Blöcke | langsam | Greift nur Gebäude an, Flächenschaden | [Später] |
+| Schamane | Unterstützung | 90 | 3 | 60 | 6 | 10 Blöcke | langsam | Heilt bis zu 5 verletzte Verbündete in 6 Blöcken um 8 HP alle 2 s, greift mit Flüchen an. Ruf 2 | [v1.0] |
+| Troll | Tank | 150 | 5 | 480 | 26 | Nahkampf | langsam | Fast kein Rückstoß, Schläge treffen Nachbarn mit (50 %) und werfen zurück, +50 % Schaden gegen Gebäude. Ruf 3 | [v1.0] |
+| Wolfsreiter | Kavallerie | 110 | 4 | 170 | 16 | Nahkampf | sehr schnell | Ansturm: erster Treffer +50 % Schaden mit Rückstoß, lädt in 6 s nach; jagt Fernkämpfer. Ruf 2 | [v1.0] |
+| Katapult | Belagerung | 200 | 5 | 150 | 60 | 22 Blöcke | langsam | Greift nur Gebäude an, Splitter treffen Einheiten ringsum (50 %). Ruf 4 | [v1.0] |
 
 Freischaltung über **Ruf** (Abschnitt 7): Sklave, Krieger und Bogenschütze sind ab Start verfügbar, die Assassine ab Ruf 1, weitere Typen ab höheren Rufstufen.
 
@@ -98,7 +98,8 @@ Jede einzelne Einheit sammelt Erfahrung: **+10 EP pro Kill, +1 EP pro 10 verursa
 | 5 | Champion | 300 | +70 % HP, +50 % Schaden, Spezialfähigkeit (siehe unten) | goldene Sterne, leuchtender Umriss |
 
 Champion-Fähigkeiten: Sklave explodiert beim Tod (20 Flächenschaden), Krieger bekommt eine Aura (+10 % Rüstung für Nachbarn),
-Bogenschütze schießt Mehrfachpfeile (3 Ziele), Assassine wird nach jedem Kill kurz wieder unsichtbar. **[Später]** für die Champion-Fähigkeiten, Level 1–4 sind [MVP].
+Bogenschütze schießt Mehrfachpfeile (3 Ziele), Assassine wird nach jedem Kill kurz wieder unsichtbar, Schamane heilt 50 % mehr in größerem Umkreis,
+Wolfsreiter lädt den Ansturm nach jedem Kill sofort neu, Troll regeneriert 1 % Leben pro Sekunde, Katapult feuert zwei Brocken. **[v1.0]**
 
 Beim Level-Aufstieg wird die Einheit voll geheilt. Getötete Veteranen bringen dem Gegner mehr Kopfgeld (+25 % pro Level über 1).
 
@@ -111,8 +112,8 @@ Wie im Original wirken diese auf alle Einheiten eines Typs, auch auf bereits leb
 | Rüstung | −8 % erlittener Schaden | 5 | 100 / 200 / 350 / 550 / 800 | [MVP] |
 | Angriff | +10 % Schaden | 5 | 100 / 200 / 350 / 550 / 800 | [MVP] |
 | Reichweite (nur Fernkampf) | +2 Blöcke | 3 | 150 / 300 / 500 | [MVP] |
-| Ausbildung | Neue Einheiten starten mit +1 Level | 2 | 400 / 900 | [Später] |
-| Ausdauer | +10 % Lauftempo | 3 | 120 / 250 / 400 | [Später] |
+| Ausbildung (gilt für die ganze Armee) | Neue Einheiten starten mit +1 Level | 2 | 400 / 900 | [v1.0] |
+| Ausdauer (gilt für die ganze Armee) | +10 % Lauftempo und Leben | 3 | 120 / 250 / 400 | [v1.0] |
 
 ### 5.4 Befehle (Haltung) [MVP]
 
@@ -131,9 +132,9 @@ und der Gegner erhält 100 Gold Kopfgeld.
 |---|---|---|
 | Helden-Level 1–10 | Erfahrung aus allen Kills der eigenen Armee (25 %) und eigenen Kills (100 %). Pro Level +15 HP, +1 Schaden. | [MVP] |
 | Blutrausch (Taste R) | Eigene Einheiten in 12 Blöcken: +30 % Angriffstempo für 8 s. Abklingzeit 30 s. | [MVP] |
-| Kampfstampfer (Taste F) | Flächenschlag, 30 Schaden in 5 Blöcken, schleudert Gegner zurück. Abklingzeit 15 s. | [MVP] |
-| Raserei (Taste V) | Lädt sich durch erlittenen und verursachten Schaden auf. Voll: 10 s doppelter Schaden, +30 % Tempo, Lebensraub 20 %. | [Später] |
-| Fähigkeitspunkte | Pro Helden-Level 1 Punkt zum Verstärken einer Fähigkeit (je 3 Ränge). | [Später] |
+| Kampfstampfer (Taste G) | Flächenschlag, 30 Schaden in 5 Blöcken, schleudert Gegner zurück. Abklingzeit 15 s. | [MVP] |
+| Raserei (Taste Y) | Lädt sich durch erlittenen und verursachten Schaden auf. Voll: 10 s +60 % Schaden, +30 % Tempo, Lebensraub 20 % (je Rang +10 % Schaden, +2 s, +5 % Lebensraub). | [v1.0] |
+| Fähigkeitspunkte | Pro Helden-Level 1 Punkt zum Verstärken einer Fähigkeit (je 3 Ränge), verteilt im Reiter „Häuptling“ des Kriegsmenüs. | [v1.0] |
 
 ## 7. Wirtschaft und Ressourcen
 
@@ -145,7 +146,7 @@ Anzeige oben links wie im Original: **Gold, Erfahrung, Ruf, Bevölkerung**.
 | Erfahrung (Clan) | Alle Kills der eigenen Seite. | Helden-Level (Abschnitt 6) | [MVP] |
 | Ruf | +1 Rufpunkt pro 400 Clan-Erfahrung, +1 für zerstörten feindlichen Turm. | Schaltet Einheitentypen, Zauber und Festungsausbauten frei (Rufstufen 0–5). | [MVP] |
 | Bevölkerung | Limit 20 zu Beginn. | Ausbau „Goblinhütten“: +10 pro Stufe (3 Stufen; 150 / 300 / 500 Gold). | [MVP] |
-| Goldmine | Festungsausbau: +1 Gold/s pro Stufe (3 Stufen; 200 / 400 / 700). | Langfristige Wirtschaft gegen frühes Zergen abwägen. | [Später] |
+| Goldmine | Festungsausbau: +1 Gold/s pro Stufe (3 Stufen; 200 / 400 / 700), wächst sichtbar im Hof. | Langfristige Wirtschaft gegen frühes Zergen abwägen. | [v1.0] |
 
 ## 8. Zauber
 
@@ -155,9 +156,9 @@ Werden vom Spieler mit Blick auf eine Stelle gewirkt (Raycast bis 40 Blöcke). K
 |---|---|---|---|---|---|
 | Feuerball | 50 Flächenschaden, Radius 3 | 60 | 12 s | 0 | [MVP] |
 | Heilende Pilze | Heilt eigene Einheiten im Radius 6 um 60 HP | 80 | 25 s | 1 | [MVP] |
-| Wurzelfessel | Gegner im Radius 5 können sich 4 s nicht bewegen | 90 | 30 s | 2 | [Später] |
-| Blitzsturm | 5 Blitze auf zufällige Gegner im Radius 8, je 45 Schaden | 150 | 45 s | 3 | [Später] |
-| Meteor | 300 Schaden im Radius 5, auch gegen Gebäude | 300 | 90 s | 5 | [Später] |
+| Wurzelfessel | Gegner im Radius 5 können sich 4 s nicht bewegen | 90 | 30 s | 2 | [v1.0] |
+| Blitzsturm | 5 Blitze auf zufällige Gegner im Radius 8, je 45 Schaden | 150 | 45 s | 3 | [v1.0] |
+| Meteor | 300 Schaden im Radius 5, auch gegen Gebäude | 300 | 90 s | 5 | [v1.0] |
 
 ## 9. Festungsausbauten
 
@@ -165,19 +166,19 @@ Werden vom Spieler mit Blick auf eine Stelle gewirkt (Raycast bis 40 Blöcke). K
 |---|---|---|---|
 | Turm | +5 Schaden, +2 Reichweite | 3 / 150, 300, 500 | [MVP] |
 | Mauern | +500 Festungs-HP | 3 / 200, 400, 650 | [MVP] |
-| Kanone | Kaufen, dann +15 Schaden, −0,5 s Nachladezeit | 1+3 / 250, 200, 350, 500 | [Später] |
+| Kanone | Steht auf der Frontmauer, 40 Flächenschaden (Radius 3) alle 4 s; je weitere Stufe +15 Schaden, −0,5 s Nachladezeit | 1+3 / 250, 200, 350, 500 | [v1.0] |
 | Goblinhütten | +10 Bevölkerung | 3 / 150, 300, 500 | [MVP] |
-| Goldmine | +1 Gold/s | 3 / 200, 400, 700 | [Später] |
+| Goldmine | +1 Gold/s | 3 / 200, 400, 700 | [v1.0] |
 
 ## 10. Steuerung und Kamera
 
-- **Third-Person erzwungen** während des Matches, Kamera hinter dem Spieler. [MVP] nutzt die normale Third-Person-Kamera (F5), [Später] Abstand per Mausrad 4–12 Blöcke einstellbar.
+- **Third-Person erzwungen** während des Matches, Kamera hinter dem Spieler. [MVP] nutzt die normale Third-Person-Kamera (F5); [v1.0] Abstand mit Bild↑/Bild↓ von 3 bis 14 Blöcken einstellbar (Standard 7).
 - **Kommandoansicht** (Taste Tab): Kamera fährt hoch über das Schlachtfeld (Vogelperspektive), Spieler bleibt stehen. [Später]
-- **Kriegsmenü** (Taste B): Bildschirm mit Knöpfen wie die Leiste im Original, Tabs *Einheiten / Upgrades / Festung / Zauber*, zeigt Kosten, Stufe und gesperrte Einträge. [MVP]
+- **Kriegsmenü** (Taste B): Bildschirm mit Knöpfen wie die Leiste im Original, Tabs *Einheiten / Upgrades / Festung / Zauber* [MVP] und *Häuptling* (Fähigkeitsränge, Raserei) [v1.0], zeigt Kosten, Stufe, gesperrte Einträge und Erklärungen als Tooltip.
 - **Schnelltasten** (frei belegbar über die Minecraft-Tastenbelegung):
-  - Einheiten rekrutieren: Num1–Num4 bzw. Z / X / C / G
+  - Einheiten rekrutieren: Z / X / C / V, dazu U / I / O / M für Schamane, Wolfsreiter, Troll und Katapult
   - Haltung: H (Vorrücken → Halten → Rückzug durchschalten)
-  - Fähigkeiten: R / F / V; Zauber: Q-Taste + Mausklick
+  - Fähigkeiten: R / G / Y; Zauber: J / K oder Rechtsklick mit dem Zauber in der Hotbar (Plätze 2–6)
 - **HUD** [MVP]: oben links Gold / Erfahrung / Ruf / Bevölkerung, oben Mitte beide Festungs-Lebensbalken, unten rechts Abklingzeiten, Lebensbalken über Einheiten (mit Level-Sternen).
 - Die normale Hotbar und das Inventar sind im Match gesperrt (nur die Clan-Waffe).
 

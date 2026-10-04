@@ -26,21 +26,28 @@ Notfall: `/gf stop` bricht ein Match ab, `/gf reset` (Operatoren) holt alle Spie
 
 ### Steuerung
 
-Die Kamera steht im Match fest in der Verfolgerperspektive. Alle Tasten lassen sich in den Steuerungsoptionen unter „Goblin Forest" ändern.
+Die Kamera steht im Match fest in der Verfolgerperspektive, ihr Abstand lässt sich einstellen. Alle Tasten lassen sich in den Steuerungsoptionen unter „Goblin Forest" ändern.
 
 | Taste | Wirkung |
 |---|---|
-| **B** (oder Kompass in der Hotbar) | Kriegsmenü: Einheiten, Upgrades, Festung, Zauber |
+| **B** | Kriegsmenü: Einheiten, Upgrades, Festung, Zauber, Häuptling |
 | **Z / X / C / V** | Sklaven / Krieger / Bogenschütze / Assassine rekrutieren |
+| **U / I / O / M** | Schamane / Wolfsreiter / Troll / Katapult rekrutieren (ab Ruf 2, 3, 4) |
 | **H** | Haltung wechseln: Vorrücken → Halten → Rückzug |
-| **N** (oder Kriegshorn) | Sammelpunkt dort setzen, wo du hinschaust; die Armee hält dort |
-| **R** / **G** | Blutrausch / Kampfstampfer (Häuptlingsfähigkeiten) |
+| **N** | Sammelpunkt dort setzen, wo du hinschaust; die Armee hält dort |
+| **R** / **G** / **Y** | Blutrausch / Kampfstampfer / Raserei (Häuptlingsfähigkeiten) |
 | **J** / **K** | Feuerball / Heilende Pilze (kosten Gold) |
+| Hotbar 2–9 + Rechtsklick | Alle Zauber (auch Wurzelfessel, Blitzsturm, Meteor) und Fähigkeiten |
+| **Bild↑** / **Bild↓** | Kamera näher / weiter weg |
 | Linksklick | Angreifen; auf Turm oder Festung des Gegners gehalten: Gebäude beschädigen |
 
 Gold kommt passiv und als Kopfgeld für getötete Goblins (mehr, je weiter vorne der Kill passiert). Kills bringen Clan-Erfahrung,
-daraus wird **Ruf** (Stufe 0 bis 5), der Assassinen, Heilzauber und höhere Upgrades freischaltet. Jeder Goblin sammelt eigene
-Erfahrung und steigt bis zum Champion (5 Sterne) auf; der Häuptling selbst erreicht Stufe 10.
+daraus wird **Ruf** (Stufe 0 bis 5), der neue Einheiten, Zauber und höhere Upgrades freischaltet. Jeder Goblin sammelt eigene
+Erfahrung und steigt bis zum Champion (5 Sterne) auf; Champions bekommen eine Spezialfähigkeit (z. B. explodierende Sklaven,
+Mehrfachschuss der Bogenschützen). Der Häuptling selbst erreicht Stufe 10 und bekommt pro Stufe einen Fähigkeitspunkt.
+
+Die Festung lässt sich ausbauen: Turm, Mauern, Hütten (mehr Armee), eine **Kanone** auf der Mauer und eine **Goldmine** im Hof.
+Dauert ein Match länger als 25 Minuten, beginnt der **Sudden Death**: beide Festungskerne verlieren dann langsam Leben.
 
 Für Server-Betreiber: Die Mod legt die Dimension `goblinforest:arena` per Datenpaket an. Sie erscheint automatisch,
 auch in bestehenden Welten, sobald die Mod installiert ist.
