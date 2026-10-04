@@ -1,0 +1,9 @@
+{
+	"command.goblinforest.info": "Goblin Forest %s is installed. Matches are coming soon.",
+	"unit.goblinforest.slave": "Slave",
+	"unit.goblinforest.warrior": "Warrior",
+	"unit.goblinforest.archer": "Archer",
+	"unit.goblinforest.assassin": "Assassin",
+	"team.goblinforest.red": "Red Clan",
+	"team.goblinforest.green": "Green Clan"
+}

@@ -1,0 +1,48 @@
+{
+	"economy": {
+		"startGold": 150,
+		"passiveGoldPerSecond": 2.0,
+		"bountyShareOfCost": 0.5,
+		"frontFactorMin": 1.0,
+		"frontFactorMax": 2.0,
+		"ownLossBountyShare": 0.25,
+		"veteranBountyBonusPerLevel": 0.25,
+		"heroKillBounty": 100,
+		"startPopulationLimit": 20,
+		"clanXpPerReputation": 400
+	},
+	"units": {
+		"slave":    { "cost": 40, "population": 1, "groupSize": 3, "health": 40,  "damage": 4,  "range": 0,  "speed": 0.25, "unlockReputation": 0 },
+		"warrior":  { "cost": 40, "population": 2, "groupSize": 1, "health": 110, "damage": 10, "range": 0,  "speed": 0.25, "unlockReputation": 0 },
+		"archer":   { "cost": 50, "population": 2, "groupSize": 1, "health": 60,  "damage": 9,  "range": 14, "speed": 0.25, "unlockReputation": 0 },
+		"assassin": { "cost": 80, "population": 3, "groupSize": 1, "health": 70,  "damage": 22, "range": 0,  "speed": 0.35, "unlockReputation": 1 }
+	},
+	"unitLeveling": {
+		"xpPerKill": 10,
+		"xpPerDamage": 0.1,
+		"xpPerBuildingHit": 5,
+		"levels": [
+			{ "title": "recruit",  "xpRequired": 0,   "healthBonus": 0.0,  "damageBonus": 0.0,  "speedBonus": 0.0 },
+			{ "title": "fighter",  "xpRequired": 20,  "healthBonus": 0.10, "damageBonus": 0.10, "speedBonus": 0.0 },
+			{ "title": "veteran",  "xpRequired": 60,  "healthBonus": 0.25, "damageBonus": 0.20, "speedBonus": 0.0 },
+			{ "title": "elite",    "xpRequired": 140, "healthBonus": 0.45, "damageBonus": 0.35, "speedBonus": 0.10 },
+			{ "title": "champion", "xpRequired": 300, "healthBonus": 0.70, "damageBonus": 0.50, "speedBonus": 0.10 }
+		]
+	},
+	"stronghold": {
+		"coreHealth": 3000,
+		"towerDamage": 15,
+		"towerRange": 24,
+		"towerShotsPerSecond": 1.0
+	},
+	"hero": {
+		"baseHealth": 200,
+		"healthPerLevel": 15,
+		"baseDamage": 12,
+		"damagePerLevel": 1,
+		"maxLevel": 10,
+		"armyXpShare": 0.25,
+		"respawnBaseSeconds": 8,
+		"respawnSecondsPerLevel": 1
+	}
+}
