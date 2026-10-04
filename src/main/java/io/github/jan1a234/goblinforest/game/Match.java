@@ -79,6 +79,11 @@ public final class Match {
 	private static final Identifier ROOT_JUMP_MODIFIER = GoblinForest.id("rooted_jump");
 	private static final Identifier RAGE_DAMAGE_MODIFIER = GoblinForest.id("rage_damage");
 	private static final Identifier RAGE_SPEED_MODIFIER = GoblinForest.id("rage_speed");
+	private static final Identifier CAMERA_MODIFIER = GoblinForest.id("camera_zoom");
+	/** Kamera-Abstand im Match: Standard 7 Blöcke (Vanilla 4), einstellbar von 3 bis 14. */
+	private static final double DEFAULT_CAMERA_OFFSET = 3.0;
+	private static final double MIN_CAMERA_OFFSET = -1.0;
+	private static final double MAX_CAMERA_OFFSET = 10.0;
 	/** Ab so vielen Ticks ohne Häuptling online verliert ein Clan kampflos. */
 	private static final int FORFEIT_TICKS = 20 * 120;
 	private static final int STRUCTURE_HIT_COOLDOWN = 12;
@@ -95,6 +100,7 @@ public final class Match {
 		long lastKitUse = -100;
 		long lastAttackWarning = -1000;
 		long rootedUntil = -1;
+		double cameraOffset = DEFAULT_CAMERA_OFFSET;
 		boolean raging;
 
 		Hero(UUID uuid, String name, TeamColor team) {
@@ -532,6 +538,7 @@ public final class Match {
 		player.setGameMode(GameType.ADVENTURE);
 		teleportToSpawn(player, hero.team);
 		applyHeroStats(player, hero.team, true);
+		applyCamera(player, hero);
 		HeroKit.apply(player, hero.team);
 		giveHeroEffects(player);
 		joinScoreboardTeam(player, hero.team);
@@ -619,6 +626,7 @@ public final class Match {
 		removeModifier(player, Attributes.JUMP_STRENGTH, ROOT_JUMP_MODIFIER);
 		removeModifier(player, Attributes.ATTACK_DAMAGE, RAGE_DAMAGE_MODIFIER);
 		removeModifier(player, Attributes.MOVEMENT_SPEED, RAGE_SPEED_MODIFIER);
+		removeModifier(player, Attributes.CAMERA_DISTANCE, CAMERA_MODIFIER);
 		setFrozen(player, false);
 		server.getScoreboard().removePlayerFromTeam(player.getScoreboardName());
 		player.removeAllEffects();
@@ -766,6 +774,11 @@ public final class Match {
 		if (source.getEntity() instanceof ServerPlayer attacker && attacker != player) {
 			onHeroDealtDamage(attacker, amount);
 		}
+	}
+
+	/** Kamera-Abstand der Verfolgerperspektive über das Vanilla-Attribut (kein Client-Eingriff nötig). */
+	private static void applyCamera(ServerPlayer player, Hero hero) {
+		setModifier(player, Attributes.CAMERA_DISTANCE, CAMERA_MODIFIER, hero.cameraOffset, AttributeModifier.Operation.ADD_VALUE);
 	}
 
 	private void clearRoot(ServerPlayer player, Hero hero) {
@@ -1297,6 +1310,10 @@ public final class Match {
 				}
 			}
 			case "rally" -> setRally(player, hero);
+			case "zoom" -> {
+				hero.cameraOffset = Math.clamp(hero.cameraOffset + ("in".equals(arg) ? -1.0 : 1.0), MIN_CAMERA_OFFSET, MAX_CAMERA_OFFSET);
+				applyCamera(player, hero);
+			}
 			case "hit_structure" -> heroStructureHit(player, hero);
 			case "menu" -> ServerPlayNetworking.send(player, io.github.jan1a234.goblinforest.net.OpenMenuPayload.INSTANCE);
 			default -> {
@@ -2069,7 +2086,38 @@ public final class Match {
 		return recruit(team, type);
 	}
 
+	/** Für den Selbsttest: Verbesserung kaufen, als hätte ein Spieler sie bestellt (inklusive Bauwerken). */
+	public PurchaseResult upgradeForTest(TeamColor team, UpgradeKey key) {
+		PurchaseResult result = teams.get(team).buyUpgrade(key);
+		if (result.ok()) {
+			onUpgradeBought(team, key);
+		}
+		return result;
+	}
+
+	/** Für den Selbsttest: Zauber ohne Häuptling auf einen Punkt wirken (bezahlt wie ein echter Zauber). */
+	public PurchaseResult castForTest(TeamColor team, SpellType spell, Vec3 target) {
+		TeamState state = teams.get(team);
+		PurchaseResult result = state.checkCast(spell, tick);
+		if (result.ok()) {
+			state.payCast(spell, tick);
+			releaseSpell(team, spell, target.add(0, 3, 0), target, null);
+		}
+		return result;
+	}
+
 	public int unitCount() {
 		return units.size();
+	}
+
+	/** Lebende Einheiten eines Typs (für den Selbsttest). */
+	public int unitCount(TeamColor team, UnitType type) {
+		int count = 0;
+		for (GoblinUnit unit : units) {
+			if (unit.isAlive() && unit.team() == team && unit.unitType() == type) {
+				count++;
+			}
+		}
+		return count;
 	}
 }

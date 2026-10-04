@@ -23,6 +23,13 @@ LEATHER_DARK = (78, 50, 28)
 CLOTH_DARK = (40, 38, 48)
 METAL = (150, 152, 160)
 METAL_DARK = (100, 102, 110)
+BONE = (226, 216, 186)
+FUR = (128, 124, 118)
+FUR_DARK = (88, 84, 80)
+ROBE = (62, 40, 70)
+TROLL = (96, 128, 108)
+TROLL_DARK = (70, 98, 80)
+GOGGLE = (120, 200, 230)
 
 TEAMS = {
     "red": ((176, 40, 32), (120, 24, 20), (226, 90, 70)),
@@ -58,8 +65,13 @@ def paint_box(img, u, v, w, h, d, color, noise, rng):
         fill(img, rect, color, noise, rng)
 
 
+def skin(unit):
+    return (TROLL, TROLL_DARK) if unit == "troll" else (SKIN, SKIN_DARK)
+
+
 def head(img, rng, unit, team):
     main, dark, light = TEAMS[team]
+    SKIN, SKIN_DARK = skin(unit)
     # Kopf 10x8x8 bei (0,0)
     paint_box(img, 0, 0, 10, 8, 8, SKIN, 8, rng)
     f = box_faces(0, 0, 10, 8, 8)["front"]
@@ -92,6 +104,47 @@ def head(img, rng, unit, team):
         for name in ("right", "left", "back"):
             r = box_faces(0, 0, 10, 8, 8)[name]
             fill(img, (r[0], r[1], r[2], r[1] + 2), METAL_DARK, 10, rng)
+    elif unit == "shaman":
+        # Knochen-Kopfschmuck mit Clanband
+        fill(img, top, BONE, 8, rng)
+        for name in ("right", "left", "back"):
+            r = box_faces(0, 0, 10, 8, 8)[name]
+            fill(img, (r[0], r[1], r[2], r[1] + 2), BONE, 8, rng)
+            fill(img, (r[0], r[1] + 2, r[2], r[1] + 3), main, 0, rng)
+        fill(img, (fx, fy, fx + 10, fy + 1), main, 0, rng)
+        for x in range(fx + 1, fx + 9, 2):
+            img.putpixel((x, fy + 1), BONE + (255,))
+        # Kriegsbemalung unter den Augen
+        for ex in (fx + 2, fx + 6):
+            img.putpixel((ex, fy + 4), light + (255,))
+            img.putpixel((ex + 1, fy + 5), light + (255,))
+    elif unit == "wolfRider":
+        # Wolfsfell über Kopf und Nacken
+        fill(img, top, FUR, 12, rng)
+        for name in ("right", "left", "back"):
+            r = box_faces(0, 0, 10, 8, 8)[name]
+            fill(img, (r[0], r[1], r[2], r[1] + 4), FUR, 12, rng)
+        fill(img, (fx, fy, fx + 10, fy + 2), FUR_DARK, 8, rng)
+        img.putpixel((fx + 1, fy + 1), TOOTH + (255,))
+        img.putpixel((fx + 8, fy + 1), TOOTH + (255,))
+    elif unit == "troll":
+        # wulstige Stirn, Narbe, Haarbüschel in Clanfarbe
+        for x in range(fx, fx + 10):
+            img.putpixel((x, fy + 2), TROLL_DARK + (255,))
+            img.putpixel((x, fy + 1), TROLL_DARK + (255,))
+        for y in range(fy + 1, fy + 6):
+            img.putpixel((fx + 7, y), (150, 90, 80, 255))
+        fill(img, (top[0] + 3, top[1] + 2, top[0] + 7, top[1] + 6), dark, 6, rng)
+    elif unit == "catapult":
+        # Kappe in Clanfarbe und Schutzbrille
+        fill(img, top, main, 8, rng)
+        for name in ("right", "left", "back"):
+            r = box_faces(0, 0, 10, 8, 8)[name]
+            fill(img, (r[0], r[1], r[2], r[1] + 2), main, 8, rng)
+            fill(img, (r[0], r[1] + 3, r[2], r[1] + 4), LEATHER_DARK, 0, rng)
+        fill(img, (fx, fy + 3, fx + 10, fy + 4), LEATHER_DARK, 0, rng)
+        for ex in (fx + 2, fx + 6):
+            fill(img, (ex, fy + 3, ex + 2, fy + 4), GOGGLE, 0, rng)
     else:
         fill(img, top, (60, 70, 30), 10, rng)
     # Nase 4x4x1 bei (31,1)
@@ -109,6 +162,7 @@ def head(img, rng, unit, team):
 
 def body(img, rng, unit, team):
     main, dark, light = TEAMS[team]
+    SKIN, SKIN_DARK = skin(unit)
     # Körper 8x12x4 bei (16,16)
     if unit == "slave":
         paint_box(img, 16, 16, 8, 12, 4, SKIN, 8, rng)
@@ -127,6 +181,31 @@ def body(img, rng, unit, team):
                 for i in range(y1 - y0):
                     x = x0 + (i * (x1 - x0)) // (y1 - y0)
                     fill(img, (x, y0 + i, min(x + 2, x1), y0 + i + 1), main, 0, rng)
+    elif unit == "shaman":
+        # Robe mit Clansaum und Knochenkette
+        paint_box(img, 16, 16, 8, 12, 4, ROBE, 8, rng)
+        for name, rect in box_faces(16, 16, 8, 12, 4).items():
+            if name in ("top", "bottom"):
+                continue
+            x0, y0, x1, y1 = rect
+            fill(img, (x0, y1 - 2, x1, y1), main, 4, rng)
+        f = box_faces(16, 16, 8, 12, 4)["front"]
+        for i, x in enumerate(range(f[0] + 1, f[2] - 1)):
+            img.putpixel((x, f[1] + 2 + (1 if 1 < i < 4 else 0)), BONE + (255,))
+        fill(img, (f[0] + 3, f[1] + 4, f[0] + 5, f[1] + 6), BONE, 0, rng)
+    elif unit == "troll":
+        # nackter Oberkörper mit Clan-Lendenschurz und Narben
+        paint_box(img, 16, 16, 8, 12, 4, SKIN, 10, rng)
+        for name, rect in box_faces(16, 16, 8, 12, 4).items():
+            if name in ("top", "bottom"):
+                continue
+            x0, y0, x1, y1 = rect
+            fill(img, (x0, y1 - 4, x1, y1), main, 8, rng)
+            fill(img, (x0, y1 - 5, x1, y1 - 4), LEATHER_DARK, 0, rng)
+        f = box_faces(16, 16, 8, 12, 4)["front"]
+        for i in range(4):
+            img.putpixel((f[0] + 2 + i, f[1] + 2 + i), (150, 90, 80, 255))
+            img.putpixel((f[0] + 5 - i // 2, f[1] + 4 + i), TROLL_DARK + (255,))
     else:
         paint_box(img, 16, 16, 8, 12, 4, main, 10, rng)
         for name, rect in box_faces(16, 16, 8, 12, 4).items():
@@ -139,6 +218,22 @@ def body(img, rng, unit, team):
             f = box_faces(16, 16, 8, 12, 4)["front"]
             fill(img, (f[0] + 1, f[1] + 1, f[2] - 1, f[1] + 7), METAL, 12, rng)
             fill(img, (f[0] + 3, f[1] + 2, f[0] + 5, f[1] + 6), light, 0, rng)
+        if unit == "wolfRider":
+            # Fellumhang auf Schultern und Rücken
+            for name, rect in box_faces(16, 16, 8, 12, 4).items():
+                if name == "bottom":
+                    continue
+                x0, y0, x1, y1 = rect
+                if name == "back":
+                    fill(img, (x0, y0, x1, y0 + 9), FUR, 12, rng)
+                else:
+                    fill(img, (x0, y0, x1, min(y1, y0 + 3)), FUR, 12, rng)
+        if unit == "catapult":
+            # Lederschürze mit Werkzeugtasche
+            f = box_faces(16, 16, 8, 12, 4)["front"]
+            fill(img, (f[0] + 1, f[1] + 2, f[2] - 1, f[3]), LEATHER, 8, rng)
+            fill(img, (f[0] + 2, f[1] + 6, f[0] + 6, f[1] + 8), LEATHER_DARK, 0, rng)
+            img.putpixel((f[0] + 3, f[1] + 5), METAL + (255,))
         if unit == "archer":
             # Köcherriemen quer über die Brust
             f = box_faces(16, 16, 8, 12, 4)["front"]
@@ -148,7 +243,30 @@ def body(img, rng, unit, team):
     for u, v in ((40, 16), (32, 48)):
         if unit == "assassin":
             paint_box(img, u, v, 4, 12, 4, CLOTH_DARK, 6, rng)
-        elif unit in ("warrior", "archer"):
+        elif unit == "shaman":
+            paint_box(img, u, v, 4, 12, 4, ROBE, 8, rng)
+            for name, rect in box_faces(u, v, 4, 12, 4).items():
+                if name not in ("top", "bottom"):
+                    x0, y0, x1, y1 = rect
+                    fill(img, (x0, y1 - 4, x1, y1), SKIN, 8, rng)
+                    fill(img, (x0, y1 - 5, x1, y1 - 4), BONE, 0, rng)
+        elif unit == "troll":
+            paint_box(img, u, v, 4, 12, 4, SKIN, 10, rng)
+            for name, rect in box_faces(u, v, 4, 12, 4).items():
+                if name not in ("top", "bottom"):
+                    x0, y0, x1, y1 = rect
+                    fill(img, (x0, y0 + 7, x1, y0 + 9), METAL_DARK, 8, rng)
+        elif unit == "wolfRider":
+            paint_box(img, u, v, 4, 12, 4, SKIN, 8, rng)
+            for name, rect in box_faces(u, v, 4, 12, 4).items():
+                if name == "bottom":
+                    continue
+                x0, y0, x1, y1 = rect
+                fill(img, (x0, y0, x1, min(y1, y0 + 4)), FUR, 10, rng)
+                if name != "top":
+                    fill(img, (x0, y1 - 5, x1, y1 - 1), LEATHER, 8, rng)
+                    fill(img, (x0, y1 - 3, x1, y1 - 2), main, 0, rng)
+        elif unit in ("warrior", "archer", "catapult"):
             paint_box(img, u, v, 4, 12, 4, SKIN, 8, rng)
             for name, rect in box_faces(u, v, 4, 12, 4).items():
                 if name in ("top",):
@@ -167,7 +285,7 @@ def body(img, rng, unit, team):
                     fill(img, (x0, y0 + 5, x1, y0 + 6), main, 0, rng)
     # Beine 4x12x4 bei (0,16) und (16,48)
     for u, v in ((0, 16), (16, 48)):
-        legs = CLOTH_DARK if unit == "assassin" else (SKIN if unit == "slave" else LEATHER)
+        legs = {"assassin": CLOTH_DARK, "slave": SKIN, "troll": SKIN, "shaman": ROBE, "wolfRider": FUR_DARK}.get(unit, LEATHER)
         paint_box(img, u, v, 4, 12, 4, legs, 8, rng)
         for name, rect in box_faces(u, v, 4, 12, 4).items():
             if name not in ("top", "bottom"):
@@ -187,9 +305,9 @@ def make(unit, team):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    for unit in ("slave", "warrior", "archer", "assassin"):
+    for unit in ("slave", "warrior", "archer", "assassin", "shaman", "wolfRider", "troll", "catapult"):
         for team in TEAMS:
-            path = os.path.join(OUT, f"{unit}_{team}.png")
+            path = os.path.join(OUT, f"{unit.lower()}_{team}.png")
             make(unit, team).save(path)
             print("geschrieben:", path)
 

@@ -100,7 +100,7 @@ public final class GfCommand {
 	}
 
 	private static int help(CommandContext<CommandSourceStack> context) {
-		String[] keys = {"join", "leave", "start", "practice", "stop", "status", "reset", "controls", "keys"};
+		String[] keys = {"join", "leave", "start", "practice", "stop", "status", "reset", "controls", "keys", "keys2", "units"};
 		context.getSource().sendSuccess(() -> Component.translatable("command.goblinforest.help.header").withStyle(ChatFormatting.GOLD), false);
 		for (String key : keys) {
 			context.getSource().sendSuccess(() -> Component.translatable("command.goblinforest.help." + key), false);

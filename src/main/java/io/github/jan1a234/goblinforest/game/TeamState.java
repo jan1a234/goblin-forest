@@ -237,6 +237,11 @@ public final class TeamState {
 		return 1.0 + balance.upgrade(UpgradeType.ENDURANCE.id()).valuePerLevel() * armyUpgrade(UpgradeType.ENDURANCE);
 	}
 
+	/** Lebensfaktor der Armee durch Ausdauer (gleicher Wert wie das Tempo). */
+	public double armyHealthMultiplier() {
+		return armySpeedMultiplier();
+	}
+
 	public boolean hasCannon() {
 		return strongholdUpgrade(UpgradeType.CANNON) > 0;
 	}

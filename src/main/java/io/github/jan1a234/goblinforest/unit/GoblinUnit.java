@@ -206,7 +206,7 @@ public class GoblinUnit extends PathfinderMob {
 	/** Überträgt Level-Boni auf Lebenspunkte und Tempo. */
 	private void applyStats(Match match, boolean fullHeal) {
 		UnitCombat combat = match.combat();
-		double maxHealth = combat.maxHealth(unitType(), unitLevel());
+		double maxHealth = combat.maxHealth(unitType(), unitLevel()) * match.team(team()).armyHealthMultiplier();
 		double ratio = getMaxHealth() > 0 ? getHealth() / getMaxHealth() : 1.0;
 		getAttribute(Attributes.MAX_HEALTH).setBaseValue(maxHealth);
 		getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(combat.speed(unitType(), unitLevel(), match.team(team()).armySpeedMultiplier()));
