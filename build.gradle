@@ -24,6 +24,17 @@ loom {
 	}
 }
 
+fabricApi {
+	// Server-Gametests (src/gametest): ein echtes Match ohne Spieler, siehe MatchGameTest.
+	configureTests {
+		createSourceSet = true
+		modId = "goblinforest-test"
+		enableGameTests = true
+		enableClientGameTests = false
+		eula = false
+	}
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"

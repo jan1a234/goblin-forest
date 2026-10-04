@@ -41,10 +41,21 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Version: $version"
+      # "build" führt auch die Gametests aus: ein komplettes Match auf einem echten Minecraft-Server.
       - name: Bauen und testen
         run: |
           chmod +x ./gradlew
-          ./gradlew build -Pmod_version="${{ steps.version.outputs.version }}"
+          set -o pipefail
+          ./gradlew build -Pmod_version="${{ steps.version.outputs.version }}" 2>&1 | tee build.log
+      - name: Ergebnis des Match-Tests
+        if: always()
+        run: grep -E "Selbsttest|required tests|tests? (passed|failed)|goblinforest-test:" build.log | tail -20 || true
+      - name: Fehler zusammenfassen
+        if: failure()
+        run: |
+          echo "===== FEHLER-ZUSAMMENFASSUNG ====="
+          grep -n -E "error:|Exception|Caused by|Description:|GameTest|gametest|FAILED|failed|ERROR|WARN.*goblinforest|[Dd]imension|arena|\[goblinforest" build.log | grep -v "fabric-gametest-api-v1:" | head -150
+          echo "===== ENDE ====="
       - name: Build-Ergebnis hochladen
         uses: actions/upload-artifact@v7
         with:

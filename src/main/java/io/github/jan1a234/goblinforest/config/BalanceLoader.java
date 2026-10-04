@@ -1,7 +1,10 @@
 package io.github.jan1a234.goblinforest.config;
 
 import com.google.gson.Gson;
+import io.github.jan1a234.goblinforest.hero.AbilityType;
+import io.github.jan1a234.goblinforest.spell.SpellType;
 import io.github.jan1a234.goblinforest.unit.UnitType;
+import io.github.jan1a234.goblinforest.upgrade.UpgradeType;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -41,21 +44,48 @@ public final class BalanceLoader {
 	}
 
 	private static void validate(Balance balance) {
-		if (balance == null || balance.economy() == null || balance.units() == null
-				|| balance.unitLeveling() == null || balance.stronghold() == null || balance.hero() == null) {
+		if (balance == null || balance.match() == null || balance.economy() == null || balance.units() == null
+				|| balance.traits() == null || balance.unitLeveling() == null || balance.upgrades() == null
+				|| balance.stronghold() == null || balance.hero() == null || balance.abilities() == null
+				|| balance.spells() == null) {
 			throw new IllegalStateException("Balancing-Datei unvollständig");
 		}
 		for (UnitType type : UnitType.values()) {
-			balance.unit(type);
+			Balance.UnitStats stats = balance.unit(type);
+			require(stats.groupSize() >= 1 && stats.cost() > 0 && stats.health() > 0, "Einheit " + type.id() + " hat ungültige Werte");
+			require(stats.attackCooldownTicks() > 0, "Einheit " + type.id() + " braucht attackCooldownTicks > 0");
 		}
 		var levels = balance.unitLeveling().levels();
-		if (levels == null || levels.isEmpty() || levels.getFirst().xpRequired() != 0) {
-			throw new IllegalStateException("Level 1 muss bei 0 EP beginnen");
-		}
+		require(levels != null && !levels.isEmpty() && levels.getFirst().xpRequired() == 0, "Level 1 muss bei 0 EP beginnen");
 		for (int i = 1; i < levels.size(); i++) {
-			if (levels.get(i).xpRequired() <= levels.get(i - 1).xpRequired()) {
-				throw new IllegalStateException("EP-Schwellen der Level müssen aufsteigend sein");
-			}
+			require(levels.get(i).xpRequired() > levels.get(i - 1).xpRequired(), "EP-Schwellen der Level müssen aufsteigend sein");
+		}
+		for (UpgradeType type : UpgradeType.values()) {
+			Balance.UpgradeTrack track = balance.upgrade(type.id());
+			require(track.costs() != null && !track.costs().isEmpty(), "Upgrade " + type.id() + " braucht Kosten");
+			require(track.unlockReputation() != null && track.unlockReputation().size() == track.costs().size(),
+					"Upgrade " + type.id() + ": unlockReputation muss so lang sein wie costs");
+		}
+		for (AbilityType ability : AbilityType.values()) {
+			require(balance.ability(ability.id()).cooldownSeconds() > 0, "Fähigkeit " + ability.id() + " braucht eine Abklingzeit");
+		}
+		for (SpellType spell : SpellType.values()) {
+			Balance.Spell config = balance.spell(spell.id());
+			require(config.upgradeCosts() != null && config.upgradeReputation() != null
+					&& config.upgradeCosts().size() == config.upgradeReputation().size(),
+					"Zauber " + spell.id() + ": upgradeCosts und upgradeReputation müssen gleich lang sein");
+		}
+		var heroXp = balance.hero().xpForLevel();
+		require(heroXp != null && heroXp.size() >= balance.hero().maxLevel() && heroXp.getFirst() == 0,
+				"hero.xpForLevel braucht einen Eintrag pro Level und beginnt bei 0");
+		for (int i = 1; i < heroXp.size(); i++) {
+			require(heroXp.get(i) > heroXp.get(i - 1), "hero.xpForLevel muss aufsteigend sein");
+		}
+	}
+
+	private static void require(boolean condition, String message) {
+		if (!condition) {
+			throw new IllegalStateException(message);
 		}
 	}
 }

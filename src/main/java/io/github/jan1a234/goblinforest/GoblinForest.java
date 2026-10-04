@@ -3,6 +3,9 @@ package io.github.jan1a234.goblinforest;
 import io.github.jan1a234.goblinforest.command.GfCommand;
 import io.github.jan1a234.goblinforest.config.Balance;
 import io.github.jan1a234.goblinforest.config.BalanceLoader;
+import io.github.jan1a234.goblinforest.game.MatchManager;
+import io.github.jan1a234.goblinforest.net.ModNetworking;
+import io.github.jan1a234.goblinforest.registry.ModEntities;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
@@ -25,6 +28,9 @@ public class GoblinForest implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		balance = BalanceLoader.loadDefaults();
+		ModEntities.register();
+		ModNetworking.registerPayloads();
+		MatchManager.init();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> GfCommand.register(dispatcher));
 
 		LOGGER.info("Goblin Forest {} geladen ({} Einheitentypen)", version(), balance.units().size());
