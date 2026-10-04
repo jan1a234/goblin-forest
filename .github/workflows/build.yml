@@ -41,12 +41,18 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Version: $version"
+      # "build" führt auch die Gametests aus: ein komplettes Match auf einem echten Minecraft-Server.
       - name: Bauen und testen
         run: |
           chmod +x ./gradlew
-          ./gradlew build -Pmod_version="${{ steps.version.outputs.version }}"
-      - name: Match-Test auf echtem Server (Gametest)
-        run: ./gradlew runGameTest -Pmod_version="${{ steps.version.outputs.version }}"
+          set -o pipefail
+          ./gradlew build -Pmod_version="${{ steps.version.outputs.version }}" 2>&1 | tee build.log
+      - name: Fehler zusammenfassen
+        if: failure()
+        run: |
+          echo "===== FEHLER-ZUSAMMENFASSUNG ====="
+          grep -n -E "error:|Exception|Caused by|Description:|GameTest|gametest|FAILED|failed|ERROR|WARN.*goblinforest|\[goblinforest" build.log | grep -v "fabric-gametest-api-v1:" | head -150
+          echo "===== ENDE ====="
       - name: Build-Ergebnis hochladen
         uses: actions/upload-artifact@v7
         with:
