@@ -977,6 +977,22 @@ public final class Match {
 		}
 	}
 
+	/** Stößt ein Lebewesen in Richtung (dx, dz) weg, abgeschwächt durch Rückstoßresistenz. */
+	private static void shove(LivingEntity entity, double dx, double dz, double strength) {
+		double length = Math.sqrt(dx * dx + dz * dz);
+		if (length < 1.0E-4) {
+			return;
+		}
+		double factor = strength * (1.0 - entity.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE));
+		if (factor <= 0) {
+			return;
+		}
+		Vec3 motion = entity.getDeltaMovement();
+		entity.setDeltaMovement(motion.x / 2 + dx / length * factor, entity.onGround() ? Math.min(0.4, motion.y / 2 + factor * 0.5) : motion.y,
+				motion.z / 2 + dz / length * factor);
+		entity.hurtMarked = true;
+	}
+
 	private static Vec3 vec(ArenaLayout.Point point) {
 		return new Vec3(point.x(), point.y(), point.z());
 	}
@@ -1262,7 +1278,7 @@ public final class Match {
 			}
 			Vec3 push = entity.position().subtract(center).multiply(1, 0, 1);
 			if (push.lengthSqr() > 1.0E-4) {
-				entity.knockback(0.5, -push.x, -push.z);
+				shove(entity, push.x, push.z, 0.5);
 				entity.hurtMarked = true;
 			}
 		}
@@ -1337,7 +1353,7 @@ public final class Match {
 					entity.invulnerableTime = 0;
 					entity.hurtServer(arena, arena.damageSources().playerAttack(player), (float) damage);
 				}
-				entity.knockback(1.3, player.getX() - entity.getX(), player.getZ() - entity.getZ());
+				shove(entity, entity.getX() - player.getX(), entity.getZ() - player.getZ(), 1.3);
 				entity.hurtMarked = true;
 			}
 			arena.sendParticles(ParticleTypes.EXPLOSION, player.getX(), player.getY() + 0.2, player.getZ(), 3, 1, 0.1, 1, 0);

@@ -186,7 +186,7 @@ public final class ArenaBuilder {
 			case MOSS_CARPET -> Blocks.MOSS_CARPET.defaultBlockState();
 			case RED_MUSHROOM_BLOCK -> Blocks.RED_MUSHROOM_BLOCK.defaultBlockState();
 			case MUSHROOM_STEM -> Blocks.MUSHROOM_STEM.defaultBlockState();
-			case TEAM_ACCENT -> Blocks.WOOL.get(side == TeamColor.RED ? DyeColor.RED : DyeColor.GREEN).defaultBlockState();
+			case TEAM_ACCENT -> Blocks.WOOL.pick(side == TeamColor.RED ? DyeColor.RED : DyeColor.GREEN).defaultBlockState();
 		};
 	}
 }
