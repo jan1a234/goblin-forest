@@ -1,5 +1,9 @@
-sh sed -n 83,162p src-x/net/minecraft/client/Camera.java
-sh sed -n 249,360p src-x/net/minecraft/client/Camera.java
-src net.minecraft.client.DeltaTracker (float|boolean|interface)
-sh grep -rn "class ClientInput\|class KeyboardInput" -A40 src-x/net/minecraft/client/player/KeyboardInput.java | head -60
-sh grep -n "keyPlayerList\|isDown()" src-x/net/minecraft/client/gui/Gui.java | head
+grep fabric/api/client/gametest/v1/
+javap net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
+javap net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
+javap net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
+javap net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldBuilder
+javap net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext
+javap net.fabricmc.fabric.api.client.gametest.v1.context.TestClientLevelContext
+javap net.fabricmc.fabric.api.client.gametest.v1.TestInput
+javap net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions
