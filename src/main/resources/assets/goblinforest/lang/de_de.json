@@ -290,5 +290,8 @@
 	"title.goblinforest.series_score": "Stand %s : %s",
 	"subtitles.goblinforest.war_drums": "Kriegstrommeln",
 	"subtitles.goblinforest.coins": "Münzen klimpern",
-	"subtitles.goblinforest.war_horn": "Kriegshorn ertönt"
+	"subtitles.goblinforest.war_horn": "Kriegshorn ertönt",
+	"key.goblinforest.command_view": "Kommandoansicht",
+	"hud.goblinforest.command_view": "Kommandoansicht – Zauber und Sammelpunkt zielen auf die Bildmitte",
+	"hud.goblinforest.command_view_help": "Bewegungstasten schwenken, %s/%s zoomen, %s zurück"
 }

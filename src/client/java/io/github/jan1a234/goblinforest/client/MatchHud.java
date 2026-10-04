@@ -53,6 +53,9 @@ public final class MatchHud {
 		drawResources(g, font, s);
 		drawCooldowns(g, font, s);
 		drawNotices(g, font, s);
+		if (CommandView.active()) {
+			drawCommandView(g, font);
+		}
 		if (s.respawnSeconds() > 0) {
 			Component text = Component.translatable("hud.goblinforest.respawn", s.respawnSeconds());
 			g.centeredText(font, text, g.guiWidth() / 2, g.guiHeight() / 2 + 20, 0xFFFF6B5B);
@@ -211,6 +214,21 @@ public final class MatchHud {
 	}
 
 	/** Hinweise in der Bildschirmmitte oben: Sudden Death, Best-of-Stand, freie Fähigkeitspunkte. */
+	/** Fadenkreuz in der Bildmitte (dort landen Zauber und Sammelpunkt) und eine kurze Bedienhilfe. */
+	private static void drawCommandView(GuiGraphicsExtractor g, Font font) {
+		int cx = g.guiWidth() / 2;
+		int cy = g.guiHeight() / 2;
+		g.fill(cx - 6, cy, cx - 2, cy + 1, GOLD);
+		g.fill(cx + 2, cy, cx + 6, cy + 1, GOLD);
+		g.fill(cx, cy - 6, cx + 1, cy - 2, GOLD);
+		g.fill(cx, cy + 2, cx + 1, cy + 6, GOLD);
+		g.outline(cx - 1, cy - 1, 3, 3, GOLD);
+		int y = g.guiHeight() - 72;
+		g.centeredText(font, Component.translatable("hud.goblinforest.command_view"), cx, y, GOLD);
+		g.centeredText(font, Component.translatable("hud.goblinforest.command_view_help", ModKeys.label("zoom:in"), ModKeys.label("zoom:out"),
+				ModKeys.COMMAND_VIEW.getTranslatedKeyMessage()), cx, y + 11, TEXT);
+	}
+
 	private static void drawNotices(GuiGraphicsExtractor g, Font font, MatchStatePayload s) {
 		int cx = g.guiWidth() / 2;
 		int y = 36;

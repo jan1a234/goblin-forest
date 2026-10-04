@@ -47,6 +47,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -105,6 +106,9 @@ public final class Match {
 		long rootedUntil = -1;
 		double cameraOffset = DEFAULT_CAMERA_OFFSET;
 		boolean raging;
+		/** Kommandoansicht: Kamera über dem Schlachtfeld, Häuptling steht still, gezielt wird auf {@link #commandFocus}. */
+		boolean commandView;
+		Vec3 commandFocus;
 
 		Hero(UUID uuid, String name, TeamColor team) {
 			this.uuid = uuid;
@@ -607,6 +611,8 @@ public final class Match {
 		updateXpBar(player, hero.team);
 		hero.prepared = true;
 		hero.dead = false;
+		hero.commandView = false;
+		hero.commandFocus = null;
 		setFrozen(player, phase == MatchPhase.COUNTDOWN || phase == MatchPhase.SETUP);
 		player.sendSystemMessage(Component.translatable("message.goblinforest.welcome",
 				Component.translatable(hero.team.translationKey()).withColor(hero.team.rgb())).withStyle(ChatFormatting.GOLD));
@@ -782,6 +788,7 @@ public final class Match {
 		if (phase != MatchPhase.BATTLE || hero.dead) {
 			return false;
 		}
+		leaveCommandView(player, hero);
 		TeamColor enemy = hero.team.opponent();
 		teams.get(hero.team).stats().heroDeaths++;
 		teams.get(enemy).stats().heroKills++;
@@ -1388,6 +1395,15 @@ public final class Match {
 				applyCamera(player, hero);
 			}
 			case "hit_structure" -> heroStructureHit(player, hero);
+			case "command_view" -> {
+				if ("on".equals(arg)) {
+					enterCommandView(player, hero);
+				} else {
+					leaveCommandView(player, hero);
+				}
+				ServerPlayNetworking.send(player, snapshot(hero));
+			}
+			case "command_focus" -> setCommandFocus(hero, arg);
 			case "menu" -> ServerPlayNetworking.send(player, io.github.jan1a234.goblinforest.net.OpenMenuPayload.INSTANCE);
 			default -> {
 			}
@@ -1557,7 +1573,64 @@ public final class Match {
 	}
 
 	/** Punkt, auf den der Spieler zielt: erster Block oder erstes Lebewesen auf der Blicklinie. */
+	private void enterCommandView(ServerPlayer player, Hero hero) {
+		if (phase != MatchPhase.BATTLE || hero.dead || hero.commandView) {
+			return;
+		}
+		hero.commandView = true;
+		hero.commandFocus = new Vec3(player.getX(), ArenaLayout.GROUND_Y + 1, player.getZ());
+		setFrozen(player, true);
+	}
+
+	private void leaveCommandView(ServerPlayer player, Hero hero) {
+		if (!hero.commandView) {
+			return;
+		}
+		hero.commandView = false;
+		hero.commandFocus = null;
+		if (phase == MatchPhase.BATTLE) {
+			setFrozen(player, false);
+		}
+	}
+
+	/** Der Client meldet, worauf die Kommandoansicht gerade blickt ("x:z"). */
+	private void setCommandFocus(Hero hero, String arg) {
+		if (!hero.commandView) {
+			return;
+		}
+		String[] xz = arg.split(":");
+		if (xz.length != 2) {
+			return;
+		}
+		try {
+			double x = Math.clamp(Double.parseDouble(xz[0]), -ArenaLayout.HALF_LENGTH + 1, ArenaLayout.HALF_LENGTH - 1);
+			double z = Math.clamp(Double.parseDouble(xz[1]), -ArenaLayout.HALF_WIDTH + 1, ArenaLayout.HALF_WIDTH - 1);
+			if (Double.isFinite(x) && Double.isFinite(z)) {
+				hero.commandFocus = new Vec3(x, ArenaLayout.GROUND_Y + 1, z);
+			}
+		} catch (NumberFormatException ignored) {
+			// ungültige Eingabe vom Client: Fokus bleibt
+		}
+	}
+
+	/** Oberfläche (erster freier Block über dem Boden) an einer Stelle der Arena. */
+	private Vec3 surfaceAt(double x, double z) {
+		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(Mth.floor(x), ArenaLayout.GROUND_Y + 24, Mth.floor(z));
+		while (pos.getY() > ArenaLayout.GROUND_Y && arena.getBlockState(pos).isAir()) {
+			pos.move(0, -1, 0);
+		}
+		return new Vec3(x, pos.getY() + 1, z);
+	}
+
+	/**
+	 * Zielpunkt für Zauber und Sammelpunkt: in der Kommandoansicht die Bildmitte, sonst der Punkt,
+	 * auf den der Häuptling schaut (erster Block oder erstes Wesen in Reichweite).
+	 */
 	private Vec3 aimPoint(ServerPlayer player, double range) {
+		Hero hero = heroes.get(player.getUUID());
+		if (hero != null && hero.commandView && hero.commandFocus != null) {
+			return surfaceAt(hero.commandFocus.x, hero.commandFocus.z);
+		}
 		Vec3 eye = player.getEyePosition();
 		Vec3 look = player.getLookAngle();
 		for (double d = 1.0; d <= range; d += 0.5) {
@@ -1976,6 +2049,7 @@ public final class Match {
 		for (ServerPlayer player : onlineHeroes()) {
 			Hero hero = heroes.get(player.getUUID());
 			boolean won = hero.team == winningTeam;
+			hero.commandView = false;
 			if (hero.dead) {
 				respawnHero(player, hero);
 			}
@@ -2172,7 +2246,7 @@ public final class Match {
 				shop, cooldowns,
 				state.abilityPoints(), (float) (state.rageCharge() / state.rageMax()), (int) ((state.rageRemaining(tick) + 19) / 20),
 				phase == MatchPhase.BATTLE ? (int) secondsUntilSuddenDeath() : -1, (float) state.incomePerSecond(),
-				new int[] {roundWins(TeamColor.RED), roundWins(TeamColor.GREEN)}, bestOf());
+				new int[] {roundWins(TeamColor.RED), roundWins(TeamColor.GREEN)}, bestOf(), hero.commandView);
 	}
 
 	/** Zeilen für {@code /gf status}. */

@@ -45,6 +45,7 @@ public class GoblinForestClient implements ClientModInitializer {
 		ClientPlayNetworking.registerGlobalReceiver(OpenMenuPayload.TYPE, (payload, context) -> openMenu(context.client()));
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
 			ClientMatchState.reset();
+			CommandView.reset();
 			WarDrums.reset(client);
 			restoreCamera(client);
 		});
@@ -70,6 +71,7 @@ public class GoblinForestClient implements ClientModInitializer {
 	private static void tick(Minecraft client) {
 		ClientMatchState.tick();
 		WarDrums.tick(client);
+		CommandView.tick(client);
 		boolean active = ClientMatchState.active() && client.player != null;
 		if (!active) {
 			restoreCamera(client);
@@ -89,9 +91,16 @@ public class GoblinForestClient implements ClientModInitializer {
 		while (ModKeys.MENU.consumeClick()) {
 			openMenu(client);
 		}
+		while (ModKeys.COMMAND_VIEW.consumeClick()) {
+			CommandView.toggle(client);
+		}
 		for (ModKeys.Binding binding : ModKeys.ACTIONS) {
 			while (binding.key().consumeClick()) {
-				ClientPlayNetworking.send(new ActionPayload(binding.action()));
+				if (CommandView.active() && binding.action().startsWith("zoom:")) {
+					CommandView.zoom(binding.action().endsWith(":in"));
+				} else {
+					ClientPlayNetworking.send(new ActionPayload(binding.action()));
+				}
 			}
 		}
 		long now = ClientMatchState.ticks();
@@ -107,7 +116,7 @@ public class GoblinForestClient implements ClientModInitializer {
 		if (ModKeys.MENU == null) {
 			return;
 		}
-		while (ModKeys.MENU.consumeClick()) {
+		while (ModKeys.MENU.consumeClick() || ModKeys.COMMAND_VIEW.consumeClick()) {
 			// außerhalb eines Matches ohne Wirkung
 		}
 		for (ModKeys.Binding binding : ModKeys.ACTIONS) {

@@ -290,5 +290,8 @@
 	"title.goblinforest.series_score": "Score %s : %s",
 	"subtitles.goblinforest.war_drums": "War drums beat",
 	"subtitles.goblinforest.coins": "Coins jingle",
-	"subtitles.goblinforest.war_horn": "War horn sounds"
+	"subtitles.goblinforest.war_horn": "War horn sounds",
+	"key.goblinforest.command_view": "Command view",
+	"hud.goblinforest.command_view": "Command view: spells and rally point target the screen centre",
+	"hud.goblinforest.command_view_help": "Movement keys pan, %s/%s zoom, %s returns"
 }

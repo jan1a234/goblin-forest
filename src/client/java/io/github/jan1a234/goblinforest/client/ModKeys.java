@@ -17,6 +17,7 @@ public final class ModKeys {
 
 	public static final List<Binding> ACTIONS = new ArrayList<>();
 	public static KeyMapping MENU;
+	public static KeyMapping COMMAND_VIEW;
 
 	private ModKeys() {
 	}
@@ -27,6 +28,7 @@ public final class ModKeys {
 
 	public static void register() {
 		MENU = key("menu", GLFW.GLFW_KEY_B);
+		COMMAND_VIEW = key("command_view", GLFW.GLFW_KEY_LEFT_ALT);
 		ACTIONS.add(new Binding(key("recruit_slave", GLFW.GLFW_KEY_Z), "recruit:slave"));
 		ACTIONS.add(new Binding(key("recruit_warrior", GLFW.GLFW_KEY_X), "recruit:warrior"));
 		ACTIONS.add(new Binding(key("recruit_archer", GLFW.GLFW_KEY_C), "recruit:archer"));
