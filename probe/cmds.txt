@@ -1,4 +1,20 @@
-src net.minecraft.gametest.framework.GameTestServer (Dimension|WorldPreset|LevelStem|bake|WorldLoader|registr)
-src net.minecraft.world.level.levelgen.WorldDimensions (public|bake|datapack|LevelStem)
-src net.minecraft.server.Main (WorldDimensions|bake|dimensions)
-sh unzip -Z1 $(find $HOME/.gradle -name 'minecraft-merged*.jar' -o -name 'minecraft-common*.jar' | head -1) | grep -E '^data/minecraft/(dimension|dimension_type)/' | head
+src net.minecraft.sounds.SoundEvents (LIGHTNING|EVOKER|ILLUSIONER|RAVAGER|WOLF|HORSE_GALLOP|DRAGON_FIREBALL|WITHER_SHOOT|IRON_GOLEM|BEACON|TOTEM|WARDEN|ZOGLIN|HOGLIN|CROSSBOW|DISPENSER|STONE_BREAK|GRAVEL_BREAK|BLAZE|ENCHANTMENT_TABLE|PIGLIN|CHAIN|GENERIC_EXPLODE|FIRECHARGE|SHULKER_BULLET|ROOTED|HANGING_ROOTS|MUD_|GOAT_HORN|NOTE_BLOCK_BASS|NOTE_BLOCK_HAT|NOTE_BLOCK_PLING|NOTE_BLOCK_BELL|WITCH|BELL_|ANVIL|ARROW|PLAYER_ATTACK|TRIDENT|MACE|SNIFFER|BREEZE|WIND_CHARGE|ELDER|ALLAY|SCULK_SHRIEKER|PLAYER_LEVELUP|EXPERIENCE_ORB|UI_)
+src net.minecraft.world.effect.MobEffects public static
+src net.minecraft.core.particles.ParticleTypes public static final
+src net.minecraft.world.entity.LightningBolt (public |void |private boolean)
+src net.minecraft.world.entity.EntityType (LIGHTNING_BOLT|FALLING_BLOCK|ITEM_DISPLAY|BLOCK_DISPLAY|EVOKER_FANGS)
+src net.minecraft.world.item.Items (BLAZE_ROD|MACE|STONE_AXE|CROSSBOW|BONE |SADDLE|TOTEM|GOLDEN_AXE|SKULL|BREEZE_ROD|WIND_CHARGE|LIGHTNING_ROD|AMETHYST_SHARD|STICK|STONE_SWORD|DIAMOND_AXE|NETHERITE_AXE|WOODEN_SWORD|GOLDEN_SWORD|IRON_SHOVEL|TRIDENT|SPEAR|HEAVY_CORE|FIRE_CHARGE|NETHER_STAR|ECHO_SHARD|BUNDLE|SPYGLASS|GOAT_HORN|RED_MUSHROOM |BROWN_MUSHROOM |HANGING_ROOTS|ENDER_EYE|RECOVERY_COMPASS|CLOCK|SNOWBALL|LEATHER_HELMET|CHAINMAIL|TURTLE_HELMET|WOLF_ARMOR|CARVED_PUMPKIN)
+src net.minecraft.world.level.block.Blocks (GOLD|RAIL|CHAIN|ANVIL|BASALT|LODESTONE|HANGING_ROOTS|CAMPFIRE|IRON_BLOCK|POINTED|SMITHING|BLAST_FURNACE|CAULDRON|TNT|COAL_BLOCK|BARREL|STRIPPED_DARK|DARK_OAK_PLANKS|DARK_OAK_STAIRS|DARK_OAK_SLAB|CRACKED_STONE|SCAFFOLD|TARGET|BLACKSTONE |POLISHED_BLACKSTONE |CHISELED_STONE|SPRUCE_TRAPDOOR|LANTERN|SOUL)
+javap net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents
+javap net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents$AfterDamage
+src net.minecraft.world.damagesource.DamageSources public
+src net.minecraft.world.entity.Mob (public void setTarget|public boolean doHurtTarget|knockback|public void setNoAi|isNoAi|setLeftHanded)
+src net.minecraft.world.entity.LivingEntity (public void knockback|public boolean addEffect|public void heal|getAttributeValue|public void setInvisible|setSprinting|protected float getJumpPower|public boolean isSensitiveToWater|canBreatheUnderwater|public void setAbsorptionAmount)
+src net.minecraft.world.entity.ai.attributes.Attributes public static final
+src net.minecraft.server.level.ServerLevel (public .* sendParticles|public boolean addFreshEntity|public void playSound|getRandomPlayer|public void explode|explode\()
+src net.minecraft.client.renderer.entity.layers.CarriedBlockLayer
+src net.minecraft.client.renderer.entity.EndermanRenderer
+src net.minecraft.client.renderer.entity.state.EndermanRenderState
+src net.minecraft.client.renderer.entity.layers.RenderLayer
+src net.minecraft.client.Camera
+src net.minecraft.client.MouseHandler (onScroll|private void|public void|scroll)
