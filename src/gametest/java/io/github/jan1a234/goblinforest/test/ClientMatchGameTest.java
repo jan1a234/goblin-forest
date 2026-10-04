@@ -16,9 +16,10 @@ import io.github.jan1a234.goblinforest.upgrade.UpgradeType;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.portal.TeleportTransition;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Startet einen echten Minecraft-Client, spielt ein kurzes Match gegen die KI an und macht Bildschirmfotos
@@ -57,10 +58,16 @@ public class ClientMatchGameTest implements FabricClientGameTest {
 					match.recruitForTest(TeamColor.RED, type);
 				}
 			});
-			ArenaLayout.Point barracks = ArenaLayout.barracks(TeamColor.RED);
-			context.getInput().lookAt(BlockPos.containing(barracks.x() + 6, barracks.y() + 1, barracks.z()));
-			context.waitTicks(50);
+			// Häuptling vor das Tor auf die Lane stellen, Blick zurück zur Festung: die Armee marschiert auf die Kamera zu.
+			singleplayer.getServer().runOnServer(server -> {
+				ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+				player.teleport(new TeleportTransition(player.level(), new Vec3(-ArenaLayout.WALL_FRONT_X + 16.5, ArenaLayout.GROUND_Y + 1, 2.5),
+						Vec3.ZERO, 90.0F, 12.0F, TeleportTransition.DO_NOTHING));
+			});
+			context.waitTicks(40);
 			context.takeScreenshot("goblinforest-02-armee");
+			context.waitTicks(40);
+			context.takeScreenshot("goblinforest-02-armee-naeher");
 
 			context.getInput().pressKey(ModKeys.MENU);
 			context.waitForScreen(WarMenuScreen.class);
@@ -83,6 +90,11 @@ public class ClientMatchGameTest implements FabricClientGameTest {
 				throw new AssertionError("Kommandoansicht ließ sich nicht öffnen");
 			}
 			context.takeScreenshot("goblinforest-05-kommandoansicht");
+			for (int i = 0; i < 3; i++) {
+				context.getInput().pressKey(ModKeys.ACTIONS.stream().filter(b -> b.action().equals("zoom:in")).findFirst().orElseThrow().key());
+			}
+			context.waitTicks(20);
+			context.takeScreenshot("goblinforest-05-kommandoansicht-nah");
 			context.getInput().holdKeyFor(options -> options.keyRight, 40);
 			context.waitTicks(10);
 			context.takeScreenshot("goblinforest-06-kommandoansicht-geschwenkt");

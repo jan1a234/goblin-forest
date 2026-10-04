@@ -145,7 +145,7 @@
 	"menu.goblinforest.unit.warrior.desc": "Zäh, blockt Treffer von vorne mit dem Schild",
 	"menu.goblinforest.unit.archer.desc": "Schießt aus sicherer Entfernung",
 	"menu.goblinforest.unit.assassin.desc": "Getarnt, erster Stich doppelt, jagt Häuptlinge",
-	"menu.goblinforest.recruit": "Rekrutieren %sg%s",
+	"menu.goblinforest.recruit": "+ %sg%s",
 	"menu.goblinforest.stance": "Haltung:",
 	"menu.goblinforest.stance.advance.desc": "Die Armee marschiert die Lane entlang zur feindlichen Festung.",
 	"menu.goblinforest.stance.hold.desc": "Die Armee bleibt stehen und verteidigt (oder am Sammelpunkt des Kriegshorns).",
@@ -292,6 +292,5 @@
 	"subtitles.goblinforest.coins": "Münzen klimpern",
 	"subtitles.goblinforest.war_horn": "Kriegshorn ertönt",
 	"key.goblinforest.command_view": "Kommandoansicht",
-	"hud.goblinforest.command_view": "Kommandoansicht – Zauber und Sammelpunkt zielen auf die Bildmitte",
-	"hud.goblinforest.command_view_help": "Bewegungstasten schwenken, %s/%s zoomen, %s zurück"
+	"hud.goblinforest.command_view": "Kommandoansicht · %s: zurück"
 }
