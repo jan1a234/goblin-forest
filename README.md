@@ -71,6 +71,11 @@ auch in bestehenden Welten, sobald die Mod installiert ist.
 
 Die Jar liegt danach in `build/libs/`. Benötigt Java 25.
 
+Getestet wird bei jedem Build auf zwei Arten: `MatchGameTest` spielt auf einem echten Server ein komplettes Match ohne Spieler
+durch (alle Einheiten, Zauber, Ausbauten, KI, Best-of-Serie), und `ClientMatchGameTest` startet einen echten Minecraft-Client,
+spielt ein Match gegen die KI an und macht Bildschirmfotos von HUD, Armee, Kriegsmenü und Kommandoansicht.
+Die neuesten Bildschirmfotos liegen im Branch [`ci-screenshots`](https://github.com/jan1a234/goblin-forest/tree/ci-screenshots).
+
 ## Release erstellen
 
 GitHub Actions baut bei jedem Push und Pull Request automatisch (`.github/workflows/build.yml`).
