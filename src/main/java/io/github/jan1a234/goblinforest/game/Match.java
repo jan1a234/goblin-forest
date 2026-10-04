@@ -11,6 +11,7 @@ import io.github.jan1a234.goblinforest.net.MatchStatePayload;
 import io.github.jan1a234.goblinforest.registry.ModEntities;
 import io.github.jan1a234.goblinforest.spell.SpellType;
 import io.github.jan1a234.goblinforest.unit.GoblinUnit;
+import io.github.jan1a234.goblinforest.unit.Knockback;
 import io.github.jan1a234.goblinforest.unit.UnitCombat;
 import io.github.jan1a234.goblinforest.unit.UnitType;
 import io.github.jan1a234.goblinforest.upgrade.UpgradeKey;
@@ -74,6 +75,15 @@ public final class Match {
 	private static final Identifier KNOCKBACK_MODIFIER = GoblinForest.id("hero_knockback");
 	private static final Identifier FREEZE_MODIFIER = GoblinForest.id("freeze");
 	private static final Identifier FREEZE_JUMP_MODIFIER = GoblinForest.id("freeze_jump");
+	private static final Identifier ROOT_MODIFIER = GoblinForest.id("rooted");
+	private static final Identifier ROOT_JUMP_MODIFIER = GoblinForest.id("rooted_jump");
+	private static final Identifier RAGE_DAMAGE_MODIFIER = GoblinForest.id("rage_damage");
+	private static final Identifier RAGE_SPEED_MODIFIER = GoblinForest.id("rage_speed");
+	private static final Identifier CAMERA_MODIFIER = GoblinForest.id("camera_zoom");
+	/** Kamera-Abstand im Match: Standard 7 Blöcke (Vanilla 4), einstellbar von 3 bis 14. */
+	private static final double DEFAULT_CAMERA_OFFSET = 3.0;
+	private static final double MIN_CAMERA_OFFSET = -1.0;
+	private static final double MAX_CAMERA_OFFSET = 10.0;
 	/** Ab so vielen Ticks ohne Häuptling online verliert ein Clan kampflos. */
 	private static final int FORFEIT_TICKS = 20 * 120;
 	private static final int STRUCTURE_HIT_COOLDOWN = 12;
@@ -89,6 +99,9 @@ public final class Match {
 		long lastStructureHit = -100;
 		long lastKitUse = -100;
 		long lastAttackWarning = -1000;
+		long rootedUntil = -1;
+		double cameraOffset = DEFAULT_CAMERA_OFFSET;
+		boolean raging;
 
 		Hero(UUID uuid, String name, TeamColor team) {
 			this.uuid = uuid;
@@ -111,6 +124,10 @@ public final class Match {
 	private final EnumMap<TeamColor, Vec3> rallyPoints = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, Integer> coreStages = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, Integer> towerCooldowns = new EnumMap<>(TeamColor.class);
+	private final EnumMap<TeamColor, Integer> cannonCooldowns = new EnumMap<>(TeamColor.class);
+	/** Best-of-Serie: gewonnene Runden je Clan und Anzahl der Runden (1 = einzelnes Match). */
+	private final EnumMap<TeamColor, Integer> roundWins = new EnumMap<>(TeamColor.class);
+	private int bestOf = 1;
 	private final EnumMap<TeamColor, Integer> lastReputation = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, Integer> offlineTicks = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, PlayerTeam> scoreboardTeams = new EnumMap<>(TeamColor.class);
@@ -138,6 +155,7 @@ public final class Match {
 			waypoints.put(team, ArenaLayout.laneWaypoints(team));
 			coreStages.put(team, 0);
 			towerCooldowns.put(team, 0);
+			cannonCooldowns.put(team, 0);
 			lastReputation.put(team, 0);
 			offlineTicks.put(team, 0);
 		}
@@ -347,6 +365,7 @@ public final class Match {
 			state.tickIncome();
 		}
 		tickTowers();
+		tickCannons();
 		tickHeroes();
 		if (tick % 20 == 0) {
 			recountPopulation();
@@ -354,6 +373,58 @@ public final class Match {
 			drawRallyMarkers();
 			checkForfeit();
 			emitStructureSmoke();
+			emitGoldmineSparkles();
+			tickSuddenDeath();
+		}
+	}
+
+	/** Sekunden bis Sudden Death (negativ, sobald er läuft). */
+	public int roundWins(TeamColor team) {
+		return roundWins.getOrDefault(team, 0);
+	}
+
+	public int bestOf() {
+		return bestOf;
+	}
+
+	/** Sekunden bis zum Sudden Death; 0, sobald er läuft; -1, wenn er abgeschaltet ist. */
+	public long secondsUntilSuddenDeath() {
+		if (balance.match().suddenDeathMinutes() <= 0) {
+			return -1;
+		}
+		return Math.max(0, (balance.match().suddenDeathTicks() - battleTicks + 19) / 20);
+	}
+
+	private void tickSuddenDeath() {
+		if (balance.match().suddenDeathMinutes() <= 0) {
+			return;
+		}
+		long remaining = balance.match().suddenDeathTicks() - battleTicks;
+		if (remaining == 60 * 20 || remaining == 10 * 20) {
+			for (ServerPlayer player : onlineHeroes()) {
+				player.sendSystemMessage(Component.translatable("message.goblinforest.sudden_death_warning", remaining / 20).withStyle(ChatFormatting.RED));
+				playTo(player, SoundEvents.BELL_BLOCK, 1.0f, 0.6f);
+			}
+		}
+		if (remaining > 0) {
+			return;
+		}
+		if (remaining == 0) {
+			for (ServerPlayer player : onlineHeroes()) {
+				title(player, Component.translatable("title.goblinforest.sudden_death").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD),
+						Component.translatable("title.goblinforest.sudden_death_sub"), 10, 50, 15);
+				playTo(player, SoundEvents.WITHER_SPAWN, 0.8f, 0.7f);
+			}
+		}
+		double percent = balance.match().suddenDeathPercentPerSecond();
+		for (TeamColor team : TeamColor.values()) {
+			if (phase != MatchPhase.BATTLE) {
+				return;
+			}
+			TeamState state = teams.get(team);
+			ArenaLayout.Point center = ArenaLayout.coreBox(team).center();
+			arena.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, center.x(), center.y() + 2, center.z(), 8, 2.5, 1.5, 2.5, 0.01);
+			damageStructure(team, Structure.CORE, state.coreMaxHealth() * percent, null, null);
 		}
 	}
 
@@ -393,7 +464,8 @@ public final class Match {
 		}
 	}
 
-	void schedule(int delayTicks, Runnable task) {
+	/** Führt eine Aufgabe nach {@code delayTicks} Ticks aus (Flugbahnen, verzögerte Explosionen). */
+	public void schedule(int delayTicks, Runnable task) {
 		scheduled.add(new Scheduled(tick + Math.max(1, delayTicks), task));
 	}
 
@@ -466,6 +538,7 @@ public final class Match {
 		player.setGameMode(GameType.ADVENTURE);
 		teleportToSpawn(player, hero.team);
 		applyHeroStats(player, hero.team, true);
+		applyCamera(player, hero);
 		HeroKit.apply(player, hero.team);
 		giveHeroEffects(player);
 		joinScoreboardTeam(player, hero.team);
@@ -549,6 +622,11 @@ public final class Match {
 		removeModifier(player, Attributes.ATTACK_DAMAGE, DAMAGE_MODIFIER);
 		removeModifier(player, Attributes.ATTACK_SPEED, ATTACK_SPEED_MODIFIER);
 		removeModifier(player, Attributes.KNOCKBACK_RESISTANCE, KNOCKBACK_MODIFIER);
+		removeModifier(player, Attributes.MOVEMENT_SPEED, ROOT_MODIFIER);
+		removeModifier(player, Attributes.JUMP_STRENGTH, ROOT_JUMP_MODIFIER);
+		removeModifier(player, Attributes.ATTACK_DAMAGE, RAGE_DAMAGE_MODIFIER);
+		removeModifier(player, Attributes.MOVEMENT_SPEED, RAGE_SPEED_MODIFIER);
+		removeModifier(player, Attributes.CAMERA_DISTANCE, CAMERA_MODIFIER);
 		setFrozen(player, false);
 		server.getScoreboard().removePlayerFromTeam(player.getScoreboardName());
 		player.removeAllEffects();
@@ -574,6 +652,13 @@ public final class Match {
 			}
 			if (tick % 10 == 0) {
 				HeroKit.enforce(player, hero.team);
+			}
+			tickRage(player, hero);
+			if (hero.rootedUntil >= 0 && tick >= hero.rootedUntil) {
+				clearRoot(player, hero);
+			} else if (hero.rootedUntil >= 0 && tick % 8 == 0) {
+				arena.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.ROOTED_DIRT.defaultBlockState()),
+						player.getX(), player.getY() + 0.2, player.getZ(), 6, 0.3, 0.1, 0.3, 0.05);
 			}
 			if (tick % 20 == 0) {
 				feed(player);
@@ -641,7 +726,12 @@ public final class Match {
 		addHeroXp(enemy, byHero ? bounty.heroKillClanXp() : bounty.heroKillClanXp() * teams.get(enemy).heroProgression().armyXpShare());
 		if (killer instanceof GoblinUnit unit && owns(unit)) {
 			unit.addXp(combat.leveling().xpForKill() * 3);
+			unit.onKilledEnemy(arena, this);
 		}
+		if (hero.raging) {
+			endRage(player, hero);
+		}
+		clearRoot(player, hero);
 		arena.sendParticles(ParticleTypes.SOUL, player.getX(), player.getY() + 1, player.getZ(), 30, 0.4, 0.8, 0.4, 0.05);
 		arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WITHER_SPAWN, SoundSource.PLAYERS, 0.4f, 1.6f);
 		hero.dead = true;
@@ -670,6 +760,31 @@ public final class Match {
 		}
 		TeamColor attacker = teamOf(source.getEntity());
 		return attacker != hero.team;
+	}
+
+	/** Nach erlittenem Schaden: lädt die Raserei des Opfers; ein angreifender Häuptling bekommt Ladung bzw. Lebensraub. */
+	public void onHeroDamaged(ServerPlayer player, DamageSource source, float amount) {
+		Hero hero = heroes.get(player.getUUID());
+		if (hero == null || hero.dead || phase != MatchPhase.BATTLE || amount <= 0) {
+			return;
+		}
+		if (!teams.get(hero.team).rageActive(tick)) {
+			onHeroTookDamage(player, hero, amount);
+		}
+		if (source.getEntity() instanceof ServerPlayer attacker && attacker != player) {
+			onHeroDealtDamage(attacker, amount);
+		}
+	}
+
+	/** Kamera-Abstand der Verfolgerperspektive über das Vanilla-Attribut (kein Client-Eingriff nötig). */
+	private static void applyCamera(ServerPlayer player, Hero hero) {
+		setModifier(player, Attributes.CAMERA_DISTANCE, CAMERA_MODIFIER, hero.cameraOffset, AttributeModifier.Operation.ADD_VALUE);
+	}
+
+	private void clearRoot(ServerPlayer player, Hero hero) {
+		hero.rootedUntil = -1;
+		removeModifier(player, Attributes.MOVEMENT_SPEED, ROOT_MODIFIER);
+		removeModifier(player, Attributes.JUMP_STRENGTH, ROOT_JUMP_MODIFIER);
 	}
 
 	public void onPlayerJoin(ServerPlayer player) {
@@ -755,6 +870,7 @@ public final class Match {
 			addHeroXp(enemy, byHero ? clanXp : clanXp * state.heroProgression().armyXpShare());
 			if (killer instanceof GoblinUnit killerUnit && owns(killerUnit)) {
 				killerUnit.addXp(combat.leveling().xpForKill());
+				killerUnit.onKilledEnemy(arena, this);
 			}
 			if (killer instanceof ServerPlayer player) {
 				player.sendOverlayMessage(Component.translatable("message.goblinforest.bounty", gold).withStyle(ChatFormatting.GOLD));
@@ -855,6 +971,134 @@ public final class Match {
 		}
 	}
 
+	/** Festungskanone: feuert auf die dichteste Gruppe von Gegnern vor dem Tor (Flächenschaden). */
+	private void tickCannons() {
+		for (TeamColor team : TeamColor.values()) {
+			TeamState state = teams.get(team);
+			if (!state.hasCannon()) {
+				continue;
+			}
+			int cooldown = cannonCooldowns.get(team) - 1;
+			if (cooldown > 0) {
+				cannonCooldowns.put(team, cooldown);
+				continue;
+			}
+			int level = state.strongholdUpgrade(UpgradeType.CANNON);
+			Vec3 muzzle = vec(ArenaLayout.cannonMuzzle(team));
+			double range = balance.stronghold().cannonRange();
+			double radius = balance.stronghold().cannonRadius();
+			AABB box = new AABB(muzzle.x - range, ArenaLayout.GROUND_Y - 2, muzzle.z - range, muzzle.x + range, muzzle.y + 4, muzzle.z + range);
+			List<LivingEntity> enemies = arena.getEntitiesOfClass(LivingEntity.class, box,
+					e -> isEnemyOf(team, e) && horizontalDistance(muzzle, e.position()) <= range && horizontalDistance(muzzle, e.position()) >= 3);
+			LivingEntity best = null;
+			int bestCount = 0;
+			for (LivingEntity candidate : enemies) {
+				int count = 0;
+				for (LivingEntity other : enemies) {
+					if (other.distanceToSqr(candidate) <= radius * radius) {
+						count++;
+					}
+				}
+				if (count > bestCount) {
+					bestCount = count;
+					best = candidate;
+				}
+			}
+			if (best == null) {
+				cannonCooldowns.put(team, 5);
+				continue;
+			}
+			cannonCooldowns.put(team, combat.cannonReloadTicks(level));
+			fireCannon(team, muzzle, best.position(), combat.cannonDamage(level), radius);
+		}
+	}
+
+	private static double horizontalDistance(Vec3 a, Vec3 b) {
+		double dx = a.x - b.x;
+		double dz = a.z - b.z;
+		return Math.sqrt(dx * dx + dz * dz);
+	}
+
+	private void fireCannon(TeamColor team, Vec3 muzzle, Vec3 target, double damage, double radius) {
+		arena.sendParticles(ParticleTypes.EXPLOSION, muzzle.x, muzzle.y, muzzle.z, 1, 0, 0, 0, 0);
+		arena.sendParticles(ParticleTypes.LARGE_SMOKE, muzzle.x, muzzle.y, muzzle.z, 12, 0.3, 0.3, 0.3, 0.05);
+		arena.playSound(null, muzzle.x, muzzle.y, muzzle.z, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 1.4f, 0.6f);
+		int flight = (int) Math.clamp(muzzle.distanceTo(target) / 1.6, 5, 16);
+		double arc = 1.5 + muzzle.distanceTo(target) * 0.12;
+		for (int i = 1; i <= flight; i++) {
+			int step = i;
+			schedule(step, () -> {
+				double t = step / (double) flight;
+				Vec3 p = muzzle.lerp(target, t).add(0, Math.sin(Math.PI * t) * arc, 0);
+				arena.sendParticles(ParticleTypes.SMOKE, p.x, p.y, p.z, 3, 0.05, 0.05, 0.05, 0);
+				arena.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.COAL_BLOCK.defaultBlockState()), p.x, p.y, p.z, 2, 0.05, 0.05, 0.05, 0);
+				if (step == flight) {
+					arena.sendParticles(ParticleTypes.EXPLOSION, target.x, target.y + 0.5, target.z, 3, radius * 0.4, 0.3, radius * 0.4, 0);
+					arena.playSound(null, target.x, target.y, target.z, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 1.2f, 1.0f);
+					areaDamage(team, target.add(0, 0.5, 0), radius, damage, arena.damageSources().magic(), 0.7);
+				}
+			});
+		}
+	}
+
+	/**
+	 * Flächenschaden an allen Gegnern eines Clans im Umkreis (Einheiten, auch getarnte, und Häuptlinge).
+	 *
+	 * @return Anzahl der getroffenen Gegner
+	 */
+	public int areaDamage(TeamColor attackerTeam, Vec3 center, double radius, double damage, DamageSource source, double knockback) {
+		AABB box = new AABB(center.x - radius, center.y - radius - 1, center.z - radius, center.x + radius, center.y + radius + 1, center.z + radius);
+		int hits = 0;
+		for (LivingEntity entity : arena.getEntitiesOfClass(LivingEntity.class, box, e -> isDamageableEnemy(attackerTeam, e))) {
+			if (entity.position().add(0, entity.getBbHeight() / 2, 0).distanceTo(center) > radius + 0.5) {
+				continue;
+			}
+			hurtAsTeam(entity, source, damage, attackerTeam);
+			if (knockback > 0) {
+				Knockback.shove(entity, entity.getX() - center.x, entity.getZ() - center.z, knockback);
+			}
+			hits++;
+		}
+		return hits;
+	}
+
+	/** Gegner, den Flächenschaden treffen darf: feindliche Einheiten (auch getarnt) und angreifbare feindliche Häuptlinge. */
+	private boolean isDamageableEnemy(TeamColor team, LivingEntity entity) {
+		if (!entity.isAlive()) {
+			return false;
+		}
+		if (entity instanceof GoblinUnit unit) {
+			return owns(unit) && unit.team() != team;
+		}
+		if (entity instanceof ServerPlayer player) {
+			return teamOf(player.getUUID()) == team.opponent() && isTargetableHero(player);
+		}
+		return false;
+	}
+
+	/** Schaden im Namen eines Clans: Einheiten merken sich den Clan für Kopfgeld, Häuptlinge ohne Unverwundbarkeitspause. */
+	private void hurtAsTeam(LivingEntity entity, DamageSource source, double damage, TeamColor team) {
+		if (entity instanceof GoblinUnit unit) {
+			unit.hurtByTeam(arena, source, (float) damage, team);
+		} else {
+			entity.invulnerableTime = 0;
+			entity.hurtServer(arena, source, (float) damage);
+		}
+	}
+
+	/** Steht ein Champion-Krieger desselben Clans nahe genug, um diese Einheit mit seiner Aura zu schützen? */
+	public boolean championWarriorNear(GoblinUnit unit) {
+		double radius = balance.unitLeveling().champion().warriorAuraRadius();
+		AABB box = unit.getBoundingBox().inflate(radius, 2, radius);
+		for (GoblinUnit other : arena.getEntitiesOfClass(GoblinUnit.class, box,
+				o -> o.isAlive() && o.unitType() == UnitType.WARRIOR && o.team() == unit.team() && owns(o))) {
+			if (combat.isChampion(other.unitLevel()) && other.distanceTo(unit) <= radius) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private boolean isEnemyOf(TeamColor team, LivingEntity entity) {
 		if (!entity.isAlive()) {
 			return false;
@@ -902,7 +1146,9 @@ public final class Match {
 		Vec3 hit = attacker != null ? closestPoint(box, attacker.position().add(0, 1, 0)) : vec(box.center());
 		arena.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, structure == Structure.CORE
 				? Blocks.MUD_BRICKS.defaultBlockState() : Blocks.COBBLESTONE.defaultBlockState()), hit.x, hit.y, hit.z, 8, 0.2, 0.2, 0.2, 0.1);
-		warnDefenders(target, structure);
+		if (attackerTeam != null) {
+			warnDefenders(target, structure);
+		}
 		if (structure == Structure.TOWER) {
 			if (!state.towerAlive()) {
 				return;
@@ -977,22 +1223,6 @@ public final class Match {
 		}
 	}
 
-	/** Stößt ein Lebewesen in Richtung (dx, dz) weg, abgeschwächt durch Rückstoßresistenz. */
-	private static void shove(LivingEntity entity, double dx, double dz, double strength) {
-		double length = Math.sqrt(dx * dx + dz * dz);
-		if (length < 1.0E-4) {
-			return;
-		}
-		double factor = strength * (1.0 - entity.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE));
-		if (factor <= 0) {
-			return;
-		}
-		Vec3 motion = entity.getDeltaMovement();
-		entity.setDeltaMovement(motion.x / 2 + dx / length * factor, entity.onGround() ? Math.min(0.4, motion.y / 2 + factor * 0.5) : motion.y,
-				motion.z / 2 + dz / length * factor);
-		entity.hurtMarked = true;
-	}
-
 	private static Vec3 vec(ArenaLayout.Point point) {
 		return new Vec3(point.x(), point.y(), point.z());
 	}
@@ -1032,6 +1262,7 @@ public final class Match {
 					feedback(player, result, Component.translatable("message.goblinforest.upgraded", upgradeName(key), state.level(key), cost));
 					if (result.ok()) {
 						announceToTeam(hero.team, player, Component.translatable("message.goblinforest.upgraded", upgradeName(key), state.level(key), cost));
+						onUpgradeBought(hero.team, key);
 					}
 				}
 			}
@@ -1056,6 +1287,17 @@ public final class Match {
 					useAbility(player, hero, ability);
 				}
 			}
+			case "ability_rank" -> {
+				AbilityType ability = AbilityType.byId(arg);
+				if (ability != null) {
+					PurchaseResult result = state.buyAbilityRank(ability);
+					feedback(player, result, Component.translatable("message.goblinforest.ability_ranked",
+							Component.translatable(ability.translationKey()), state.abilityRank(ability)));
+					if (result.ok() && ability == AbilityType.RAGE && hero.raging) {
+						applyRageModifiers(player, hero.team);
+					}
+				}
+			}
 			case "stance" -> {
 				Stance stance = "next".equals(arg) ? state.stance().next() : null;
 				for (Stance candidate : Stance.values()) {
@@ -1068,6 +1310,10 @@ public final class Match {
 				}
 			}
 			case "rally" -> setRally(player, hero);
+			case "zoom" -> {
+				hero.cameraOffset = Math.clamp(hero.cameraOffset + ("in".equals(arg) ? -1.0 : 1.0), MIN_CAMERA_OFFSET, MAX_CAMERA_OFFSET);
+				applyCamera(player, hero);
+			}
 			case "hit_structure" -> heroStructureHit(player, hero);
 			case "menu" -> ServerPlayNetworking.send(player, io.github.jan1a234.goblinforest.net.OpenMenuPayload.INSTANCE);
 			default -> {
@@ -1086,20 +1332,61 @@ public final class Match {
 		}
 		hero.lastKitUse = tick;
 		HeroKit.Slot slot = HeroKit.Slot.byId(kitId);
-		if (slot == null) {
-			return true;
+		if (slot != null && !slot.action().isEmpty()) {
+			handleAction(player, slot.action());
 		}
-		switch (slot) {
-			case FIREBALL -> handleAction(player, "cast:" + SpellType.FIREBALL.id());
-			case HEALING -> handleAction(player, "cast:" + SpellType.HEALING.id());
-			case BLOODLUST -> handleAction(player, "ability:" + AbilityType.BLOODLUST.id());
-			case BATTLE_SLAM -> handleAction(player, "ability:" + AbilityType.BATTLE_SLAM.id());
-			case RALLY -> handleAction(player, "rally");
-			case MENU -> handleAction(player, "menu");
+		return true;
+	}
+
+	/** Gekaufte Verbesserung sofort sichtbar machen: Ausdauer wirkt auf lebende Einheiten, Kanone und Goldmine werden gebaut. */
+	private void onUpgradeBought(TeamColor team, UpgradeKey key) {
+		TeamState state = teams.get(team);
+		switch (key.type()) {
+			case ENDURANCE -> {
+				for (GoblinUnit unit : units) {
+					if (unit.team() == team && unit.isAlive()) {
+						unit.refreshStats();
+					}
+				}
+			}
+			case CANNON -> {
+				int level = state.strongholdUpgrade(UpgradeType.CANNON);
+				ArenaBuilder.apply(arena, ArenaBlueprint.cannonBlocks(team, level));
+				Vec3 at = vec(ArenaLayout.cannonBlock(team));
+				arena.sendParticles(ParticleTypes.CLOUD, at.x + 0.5, at.y + 0.5, at.z + 0.5, 15, 0.4, 0.4, 0.4, 0.02);
+				arena.playSound(null, at.x, at.y, at.z, SoundEvents.ANVIL_USE, SoundSource.BLOCKS, 1.0f, 0.8f);
+				if (level == 1) {
+					cannonCooldowns.put(team, 40);
+				}
+			}
+			case GOLDMINE -> {
+				int level = state.strongholdUpgrade(UpgradeType.GOLDMINE);
+				ArenaBuilder.apply(arena, ArenaBlueprint.goldmineBlocks(team, level));
+				Vec3 at = vec(ArenaLayout.goldmine(team));
+				arena.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.GOLD_ORE.defaultBlockState()),
+						at.x, at.y, at.z, 40, 1.0, 0.6, 1.0, 0.1);
+				arena.playSound(null, at.x, at.y, at.z, SoundEvents.STONE_BREAK, SoundSource.BLOCKS, 1.2f, 0.7f);
+				arena.playSound(null, at.x, at.y, at.z, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0f, 1.4f);
+			}
 			default -> {
 			}
 		}
-		return true;
+	}
+
+	/** Goldglitzern über der Goldmine, damit man das Einkommen sieht. */
+	private void emitGoldmineSparkles() {
+		if (tick % 30 != 0) {
+			return;
+		}
+		for (TeamColor team : TeamColor.values()) {
+			int level = teams.get(team).strongholdUpgrade(UpgradeType.GOLDMINE);
+			if (level <= 0) {
+				continue;
+			}
+			Vec3 at = vec(ArenaLayout.goldmine(team));
+			arena.sendParticles(new DustParticleOptions(0xF2C744, 1.2f), at.x, at.y + 1.0, at.z, 2 + level * 2, 0.8, 0.6, 0.8, 0);
+			arena.sendParticles(ParticleTypes.WAX_ON, at.x, at.y + 0.5, at.z, level, 0.8, 0.4, 0.8, 0);
+		}
 	}
 
 	private Component upgradeName(UpgradeKey key) {
@@ -1153,7 +1440,6 @@ public final class Match {
 		rallyPoints.put(hero.team, point);
 		setStance(hero.team, Stance.HOLD);
 		arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RAID_HORN.value(), SoundSource.PLAYERS, 0.5f, 1.4f);
-		player.getCooldowns().addCooldown(HeroKit.create(HeroKit.Slot.RALLY), 40);
 	}
 
 	private void drawRallyMarkers() {
@@ -1185,7 +1471,8 @@ public final class Match {
 			return;
 		}
 		hero.lastStructureHit = tick;
-		double damage = teams.get(hero.team).heroProgression().damage(teams.get(hero.team).heroLevel());
+		TeamState state = teams.get(hero.team);
+		double damage = state.heroProgression().damage(state.heroLevel()) * state.heroDamageMultiplier(tick);
 		Vec3 location = hit.getLocation();
 		arena.sendParticles(ParticleTypes.CRIT, location.x, location.y, location.z, 8, 0.2, 0.2, 0.2, 0.2);
 		arena.playSound(null, location.x, location.y, location.z, SoundEvents.ZOMBIE_ATTACK_WOODEN_DOOR, SoundSource.PLAYERS, 0.5f, 1.2f);
@@ -1230,20 +1517,31 @@ public final class Match {
 		}
 		Balance.Spell config = balance.spell(spell.id());
 		state.payCast(spell, tick);
-		HeroKit.Slot slot = spell == SpellType.FIREBALL ? HeroKit.Slot.FIREBALL : HeroKit.Slot.HEALING;
-		player.getCooldowns().addCooldown(HeroKit.create(slot), config.cooldownSeconds() * 20);
-		double amount = config.amountAtLevel(state.spellLevel(spell));
+		player.getCooldowns().addCooldown(HeroKit.create(HeroKit.Slot.forAction(spell.id())), config.cooldownSeconds() * 20);
 		Vec3 target = aimPoint(player, config.range());
 		player.swing(net.minecraft.world.InteractionHand.MAIN_HAND, true);
-		if (spell == SpellType.FIREBALL) {
-			launchFireball(player, hero.team, target, config.radius(), amount);
-		} else {
-			castHealing(hero.team, target, config.radius(), amount);
+		Vec3 origin = player.getEyePosition().add(player.getLookAngle().scale(0.8));
+		releaseSpell(hero.team, spell, origin, target, player);
+	}
+
+	/**
+	 * Wirkt einen bereits bezahlten Zauber von {@code origin} auf {@code target}. {@code caster} darf null sein
+	 * (KI-Clan oder Selbsttest); dann zählt der Schaden nur für den Clan.
+	 */
+	private void releaseSpell(TeamColor team, SpellType spell, Vec3 origin, Vec3 target, ServerPlayer caster) {
+		Balance.Spell config = balance.spell(spell.id());
+		double amount = config.amountAtLevel(teams.get(team).spellLevel(spell));
+		DamageSource source = caster != null ? arena.damageSources().indirectMagic(caster, caster) : arena.damageSources().magic();
+		switch (spell) {
+			case FIREBALL -> launchFireball(origin, team, target, config.radius(), amount, source);
+			case HEALING -> castHealing(team, target, config.radius(), amount);
+			case ROOTS -> castRoots(team, target, config.radius(), (int) Math.round(amount * 20));
+			case LIGHTNING -> castLightning(team, target, config.radius(), amount, Math.max(1, config.count()), source);
+			case METEOR -> castMeteor(team, target, config.radius(), amount, source);
 		}
 	}
 
-	private void launchFireball(ServerPlayer caster, TeamColor team, Vec3 target, double radius, double damage) {
-		Vec3 from = caster.getEyePosition().add(caster.getLookAngle().scale(0.8));
+	private void launchFireball(Vec3 from, TeamColor team, Vec3 target, double radius, double damage, DamageSource source) {
 		arena.playSound(null, from.x, from.y, from.z, SoundEvents.BLAZE_SHOOT, SoundSource.PLAYERS, 1.0f, 0.9f);
 		int flight = (int) Math.max(4, Math.min(16, from.distanceTo(target) / 2.5));
 		for (int i = 1; i <= flight; i++) {
@@ -1253,35 +1551,18 @@ public final class Match {
 				arena.sendParticles(ParticleTypes.FLAME, point.x, point.y, point.z, 8, 0.15, 0.15, 0.15, 0.02);
 				arena.sendParticles(ParticleTypes.LARGE_SMOKE, point.x, point.y, point.z, 2, 0.1, 0.1, 0.1, 0.01);
 				if (step == flight) {
-					explodeFireball(caster, team, target, radius, damage);
+					explodeFireball(team, target, radius, damage, source);
 				}
 			});
 		}
 	}
 
-	private void explodeFireball(ServerPlayer caster, TeamColor team, Vec3 center, double radius, double damage) {
+	private void explodeFireball(TeamColor team, Vec3 center, double radius, double damage, DamageSource source) {
 		arena.sendParticles(ParticleTypes.EXPLOSION_EMITTER, center.x, center.y, center.z, 1, 0, 0, 0, 0);
 		arena.sendParticles(ParticleTypes.FLAME, center.x, center.y, center.z, 60, radius * 0.4, 0.5, radius * 0.4, 0.15);
 		arena.sendParticles(ParticleTypes.LAVA, center.x, center.y, center.z, 12, radius * 0.3, 0.3, radius * 0.3, 0);
 		arena.playSound(null, center.x, center.y, center.z, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.PLAYERS, 1.6f, 1.1f);
-		DamageSource source = arena.damageSources().indirectMagic(caster, caster);
-		AABB box = new AABB(center.x - radius, center.y - radius, center.z - radius, center.x + radius, center.y + radius, center.z + radius);
-		for (LivingEntity entity : arena.getEntitiesOfClass(LivingEntity.class, box, e -> isEnemyOf(team, e) || (e instanceof GoblinUnit u && owns(u) && u.team() != team))) {
-			if (entity.position().distanceTo(center) > radius + 0.5) {
-				continue;
-			}
-			if (entity instanceof GoblinUnit unit) {
-				unit.hurtByTeam(arena, source, (float) damage, team);
-			} else {
-				entity.invulnerableTime = 0;
-				entity.hurtServer(arena, source, (float) damage);
-			}
-			Vec3 push = entity.position().subtract(center).multiply(1, 0, 1);
-			if (push.lengthSqr() > 1.0E-4) {
-				shove(entity, push.x, push.z, 0.5);
-				entity.hurtMarked = true;
-			}
-		}
+		areaDamage(team, center, radius, damage, source, 0.5);
 	}
 
 	private void castHealing(TeamColor team, Vec3 center, double radius, double amount) {
@@ -1304,6 +1585,138 @@ public final class Match {
 		}
 	}
 
+	/** Wurzelfessel: Gegner im Umkreis können sich für {@code ticks} Ticks nicht bewegen. */
+	private void castRoots(TeamColor team, Vec3 center, double radius, int ticks) {
+		BlockParticleOption roots = new BlockParticleOption(ParticleTypes.BLOCK, Blocks.ROOTED_DIRT.defaultBlockState());
+		for (int i = 0; i < 40; i++) {
+			double angle = Math.PI * 2 * i / 40;
+			arena.sendParticles(roots, center.x + Math.cos(angle) * radius, center.y + 0.2, center.z + Math.sin(angle) * radius, 3, 0.1, 0.1, 0.1, 0.05);
+		}
+		arena.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.HANGING_ROOTS.defaultBlockState()),
+				center.x, center.y + 0.5, center.z, 60, radius * 0.5, 0.4, radius * 0.5, 0.1);
+		arena.playSound(null, center.x, center.y, center.z, SoundEvents.ROOTED_DIRT_BREAK, SoundSource.PLAYERS, 1.5f, 0.6f);
+		arena.playSound(null, center.x, center.y, center.z, SoundEvents.EVOKER_PREPARE_ATTACK, SoundSource.PLAYERS, 0.8f, 0.8f);
+		AABB box = new AABB(center.x - radius, center.y - radius - 1, center.z - radius, center.x + radius, center.y + radius + 1, center.z + radius);
+		for (LivingEntity entity : arena.getEntitiesOfClass(LivingEntity.class, box, e -> isDamageableEnemy(team, e))) {
+			if (entity.position().distanceTo(center) > radius + 0.5) {
+				continue;
+			}
+			if (entity instanceof GoblinUnit unit) {
+				unit.root(ticks);
+			} else if (entity instanceof ServerPlayer player) {
+				rootHero(player, ticks);
+			}
+		}
+	}
+
+	private void rootHero(ServerPlayer player, int ticks) {
+		Hero hero = heroes.get(player.getUUID());
+		if (hero == null) {
+			return;
+		}
+		hero.rootedUntil = Math.max(hero.rootedUntil, tick + ticks);
+		setModifier(player, Attributes.MOVEMENT_SPEED, ROOT_MODIFIER, -1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+		setModifier(player, Attributes.JUMP_STRENGTH, ROOT_JUMP_MODIFIER, -1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+		player.sendOverlayMessage(Component.translatable("message.goblinforest.rooted").withStyle(ChatFormatting.DARK_GREEN));
+	}
+
+	/** Blitzsturm: {@code bolts} Blitze nacheinander auf zufällige Gegner im Umkreis (bei wenigen Gegnern auch mehrfach). */
+	private void castLightning(TeamColor team, Vec3 center, double radius, double damage, int bolts, DamageSource source) {
+		arena.playSound(null, center.x, center.y, center.z, SoundEvents.EVOKER_CAST_SPELL, SoundSource.PLAYERS, 1.2f, 0.7f);
+		arena.sendParticles(ParticleTypes.ELECTRIC_SPARK, center.x, center.y + 6, center.z, 80, radius * 0.6, 1.0, radius * 0.6, 0.1);
+		for (int i = 0; i < bolts; i++) {
+			schedule(6 + i * 6, () -> {
+				AABB box = new AABB(center.x - radius, center.y - radius - 2, center.z - radius, center.x + radius, center.y + radius + 2, center.z + radius);
+				List<LivingEntity> targets = new ArrayList<>();
+				for (LivingEntity entity : arena.getEntitiesOfClass(LivingEntity.class, box, e -> isDamageableEnemy(team, e))) {
+					if (horizontalDistance(center, entity.position()) <= radius) {
+						targets.add(entity);
+					}
+				}
+				Vec3 strike;
+				LivingEntity victim = null;
+				if (targets.isEmpty()) {
+					double angle = arena.getRandom().nextDouble() * Math.PI * 2;
+					double distance = arena.getRandom().nextDouble() * radius;
+					strike = new Vec3(center.x + Math.cos(angle) * distance, ArenaLayout.GROUND_Y + 1, center.z + Math.sin(angle) * distance);
+				} else {
+					victim = targets.get(arena.getRandom().nextInt(targets.size()));
+					strike = victim.position();
+				}
+				strikeVisual(strike);
+				if (victim != null) {
+					hurtAsTeam(victim, source, damage, team);
+				}
+			});
+		}
+	}
+
+	/** Blitz nur als Effekt (kein Feuer, kein Vanilla-Schaden); der Schaden kommt vom Zauber. */
+	private void strikeVisual(Vec3 at) {
+		net.minecraft.world.entity.LightningBolt bolt = net.minecraft.world.entity.EntityTypes.LIGHTNING_BOLT.create(arena, EntitySpawnReason.TRIGGERED);
+		if (bolt != null) {
+			bolt.setVisualOnly(true);
+			bolt.snapTo(at.x, at.y, at.z, 0, 0);
+			arena.addFreshEntity(bolt);
+		}
+		arena.sendParticles(ParticleTypes.ELECTRIC_SPARK, at.x, at.y + 1, at.z, 30, 0.4, 1.0, 0.4, 0.3);
+		arena.sendParticles(ParticleTypes.END_ROD, at.x, at.y + 1.5, at.z, 12, 0.2, 1.2, 0.2, 0.05);
+	}
+
+	/**
+	 * Meteor: kurze Warnung am Boden, dann stürzt ein Feuerbrocken vom Himmel. Trifft alle Gegner im Umkreis
+	 * und auch feindliche Gebäude.
+	 */
+	private void castMeteor(TeamColor team, Vec3 target, double radius, double damage, DamageSource source) {
+		Vec3 ground = new Vec3(target.x, ArenaLayout.GROUND_Y + 1, target.z);
+		Vec3 sky = ground.add(-ArenaLayout.side(team) * -10, 30, 6);
+		int warning = 20;
+		int fall = 16;
+		DustParticleOptions red = new DustParticleOptions(0xFF3010, 2.0f);
+		for (int i = 0; i < warning; i += 4) {
+			schedule(i + 1, () -> {
+				for (int k = 0; k < 32; k++) {
+					double angle = Math.PI * 2 * k / 32;
+					arena.sendParticles(red, ground.x + Math.cos(angle) * radius, ground.y + 0.1, ground.z + Math.sin(angle) * radius, 1, 0, 0, 0, 0);
+				}
+			});
+		}
+		arena.playSound(null, ground.x, ground.y, ground.z, SoundEvents.WARDEN_SONIC_CHARGE, SoundSource.PLAYERS, 1.5f, 0.6f);
+		for (int i = 1; i <= fall; i++) {
+			int step = i;
+			schedule(warning + step, () -> {
+				Vec3 p = sky.lerp(ground, step / (double) fall);
+				arena.sendParticles(ParticleTypes.FLAME, p.x, p.y, p.z, 25, 0.5, 0.5, 0.5, 0.05);
+				arena.sendParticles(ParticleTypes.LARGE_SMOKE, p.x, p.y, p.z, 8, 0.4, 0.4, 0.4, 0.02);
+				arena.sendParticles(ParticleTypes.LAVA, p.x, p.y, p.z, 3, 0.3, 0.3, 0.3, 0);
+				if (step == 1) {
+					arena.playSound(null, p.x, p.y, p.z, SoundEvents.BLAZE_SHOOT, SoundSource.PLAYERS, 3.0f, 0.4f);
+				}
+				if (step == fall) {
+					impactMeteor(team, ground, radius, damage, source);
+				}
+			});
+		}
+	}
+
+	private void impactMeteor(TeamColor team, Vec3 ground, double radius, double damage, DamageSource source) {
+		arena.sendParticles(ParticleTypes.EXPLOSION_EMITTER, ground.x, ground.y + 0.5, ground.z, 3, radius * 0.4, 0.3, radius * 0.4, 0);
+		arena.sendParticles(ParticleTypes.LAVA, ground.x, ground.y + 0.5, ground.z, 40, radius * 0.5, 0.5, radius * 0.5, 0);
+		arena.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.MAGMA_BLOCK.defaultBlockState()),
+				ground.x, ground.y + 0.5, ground.z, 120, radius * 0.5, 0.8, radius * 0.5, 0.3);
+		arena.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, ground.x, ground.y + 0.5, ground.z, 30, radius * 0.4, 0.5, radius * 0.4, 0.02);
+		arena.playSound(null, ground.x, ground.y, ground.z, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.PLAYERS, 4.0f, 0.5f);
+		arena.playSound(null, ground.x, ground.y, ground.z, SoundEvents.DRAGON_FIREBALL_EXPLODE, SoundSource.PLAYERS, 2.0f, 0.7f);
+		areaDamage(team, ground.add(0, 0.5, 0), radius, damage, source, 1.2);
+		TeamColor enemy = team.opponent();
+		for (Structure structure : Structure.values()) {
+			ArenaLayout.Box box = structure == Structure.CORE ? ArenaLayout.coreBox(enemy) : ArenaLayout.towerBox(enemy);
+			if (structureAlive(enemy, structure) && box.distance(ground.x, ground.y, ground.z) <= radius) {
+				damageStructure(enemy, structure, damage, null, team);
+			}
+		}
+	}
+
 	private void useAbility(ServerPlayer player, Hero hero, AbilityType ability) {
 		if (phase != MatchPhase.BATTLE) {
 			return;
@@ -1320,47 +1733,126 @@ public final class Match {
 		}
 		state.startAbilityCooldown(ability, tick);
 		Balance.Ability config = balance.ability(ability.id());
-		HeroKit.Slot slot = ability == AbilityType.BLOODLUST ? HeroKit.Slot.BLOODLUST : HeroKit.Slot.BATTLE_SLAM;
-		player.getCooldowns().addCooldown(HeroKit.create(slot), config.cooldownSeconds() * 20);
+		int rank = state.abilityRank(ability);
+		if (!ability.charged()) {
+			player.getCooldowns().addCooldown(HeroKit.create(HeroKit.Slot.forAction(ability.id())), config.cooldownTicksAt(rank));
+		}
 		player.swing(net.minecraft.world.InteractionHand.MAIN_HAND, true);
-		double radius = config.radius();
+		double radius = config.radiusAt(rank);
 		AABB box = player.getBoundingBox().inflate(radius, 3, radius);
-		if (ability == AbilityType.BLOODLUST) {
-			int affected = 0;
-			for (GoblinUnit unit : arena.getEntitiesOfClass(GoblinUnit.class, box, u -> owns(u) && u.team() == hero.team && u.isAlive())) {
-				if (unit.distanceTo(player) <= radius) {
-					unit.applyBloodlust(config.durationSeconds() * 20);
-					arena.sendParticles(ParticleTypes.ANGRY_VILLAGER, unit.getX(), unit.getY() + 2.2, unit.getZ(), 1, 0.1, 0.1, 0.1, 0);
-					affected++;
+		switch (ability) {
+			case BLOODLUST -> {
+				int affected = 0;
+				for (GoblinUnit unit : arena.getEntitiesOfClass(GoblinUnit.class, box, u -> owns(u) && u.team() == hero.team && u.isAlive())) {
+					if (unit.distanceTo(player) <= radius) {
+						unit.applyBloodlust(config.durationTicksAt(rank), config.amountAt(rank));
+						arena.sendParticles(ParticleTypes.ANGRY_VILLAGER, unit.getX(), unit.getY() + 2.2, unit.getZ(), 1, 0.1, 0.1, 0.1, 0);
+						affected++;
+					}
 				}
+				DustParticleOptions dust = new DustParticleOptions(0xD0201A, 1.6f);
+				for (int i = 0; i < 48; i++) {
+					double angle = Math.PI * 2 * i / 48;
+					arena.sendParticles(dust, player.getX() + Math.cos(angle) * radius, player.getY() + 0.3, player.getZ() + Math.sin(angle) * radius, 1, 0, 0.1, 0, 0);
+				}
+				arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RAVAGER_ROAR, SoundSource.PLAYERS, 0.8f, 1.5f);
+				player.sendOverlayMessage(Component.translatable("message.goblinforest.bloodlust", affected).withStyle(ChatFormatting.RED));
 			}
-			DustParticleOptions dust = new DustParticleOptions(0xD0201A, 1.6f);
-			for (int i = 0; i < 48; i++) {
-				double angle = Math.PI * 2 * i / 48;
-				arena.sendParticles(dust, player.getX() + Math.cos(angle) * radius, player.getY() + 0.3, player.getZ() + Math.sin(angle) * radius, 1, 0, 0.1, 0, 0);
+			case BATTLE_SLAM -> {
+				double damage = config.amountAt(rank) * state.heroDamageMultiplier(tick);
+				for (LivingEntity entity : arena.getEntitiesOfClass(LivingEntity.class, box, e -> isDamageableEnemy(hero.team, e))) {
+					if (entity.distanceTo(player) > radius) {
+						continue;
+					}
+					hurtAsTeam(entity, arena.damageSources().playerAttack(player), damage, hero.team);
+					Knockback.shove(entity, entity.getX() - player.getX(), entity.getZ() - player.getZ(), 1.3);
+				}
+				arena.sendParticles(ParticleTypes.EXPLOSION, player.getX(), player.getY() + 0.2, player.getZ(), 3, 1, 0.1, 1, 0);
+				arena.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.DIRT.defaultBlockState()),
+						player.getX(), player.getY() + 0.1, player.getZ(), 80, radius * 0.5, 0.1, radius * 0.5, 0.3);
+				arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.PLAYERS, 1.0f, 0.8f);
+				arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.GENERIC_EXPLODE.value(), SoundSource.PLAYERS, 0.6f, 1.4f);
 			}
-			arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RAVAGER_ROAR, SoundSource.PLAYERS, 0.8f, 1.5f);
-			player.sendOverlayMessage(Component.translatable("message.goblinforest.bloodlust", affected).withStyle(ChatFormatting.RED));
+			case RAGE -> startRage(player, hero);
+		}
+	}
+
+	// ================================================================ Raserei
+
+	private void startRage(ServerPlayer player, Hero hero) {
+		TeamState state = teams.get(hero.team);
+		hero.raging = true;
+		applyRageModifiers(player, hero.team);
+		title(player, Component.empty(), Component.translatable("title.goblinforest.rage").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD), 0, 30, 10);
+		arena.sendParticles(ParticleTypes.ANGRY_VILLAGER, player.getX(), player.getY() + 2.2, player.getZ(), 6, 0.4, 0.3, 0.4, 0);
+		arena.sendParticles(ParticleTypes.FLAME, player.getX(), player.getY() + 1, player.getZ(), 40, 0.5, 0.8, 0.5, 0.08);
+		arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RAVAGER_ROAR, SoundSource.PLAYERS, 1.2f, 0.8f);
+		arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WARDEN_ROAR, SoundSource.PLAYERS, 0.4f, 1.6f);
+		announceToTeam(hero.team.opponent(), null, Component.translatable("message.goblinforest.enemy_rage").withStyle(ChatFormatting.RED));
+		player.sendOverlayMessage(Component.translatable("message.goblinforest.rage_started",
+				state.rageRemaining(tick) / 20).withStyle(ChatFormatting.DARK_RED));
+	}
+
+	private void applyRageModifiers(ServerPlayer player, TeamColor team) {
+		TeamState state = teams.get(team);
+		setModifier(player, Attributes.ATTACK_DAMAGE, RAGE_DAMAGE_MODIFIER, state.heroDamageMultiplier(tick) - 1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+		setModifier(player, Attributes.MOVEMENT_SPEED, RAGE_SPEED_MODIFIER, balance.rage().speedBonus(), AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
+	}
+
+	private void endRage(ServerPlayer player, Hero hero) {
+		hero.raging = false;
+		teams.get(hero.team).endRage();
+		removeModifier(player, Attributes.ATTACK_DAMAGE, RAGE_DAMAGE_MODIFIER);
+		removeModifier(player, Attributes.MOVEMENT_SPEED, RAGE_SPEED_MODIFIER);
+	}
+
+	private void tickRage(ServerPlayer player, Hero hero) {
+		if (!hero.raging) {
+			return;
+		}
+		TeamState state = teams.get(hero.team);
+		if (!state.rageActive(tick)) {
+			endRage(player, hero);
+			player.sendOverlayMessage(Component.translatable("message.goblinforest.rage_ended").withStyle(ChatFormatting.GRAY));
+			return;
+		}
+		if (tick % 4 == 0) {
+			arena.sendParticles(new DustParticleOptions(0xB01010, 1.4f), player.getX(), player.getY() + 1.0, player.getZ(), 3, 0.35, 0.6, 0.35, 0);
+			arena.sendParticles(ParticleTypes.SMALL_FLAME, player.getX(), player.getY() + 0.2, player.getZ(), 1, 0.3, 0.1, 0.3, 0.01);
+		}
+	}
+
+	/** Der Häuptling hat Schaden ausgeteilt: Raserei laden, während der Raserei Lebensraub. */
+	public void onHeroDealtDamage(ServerPlayer player, double amount) {
+		Hero hero = heroes.get(player.getUUID());
+		if (hero == null || hero.dead || phase != MatchPhase.BATTLE || amount <= 0) {
+			return;
+		}
+		TeamState state = teams.get(hero.team);
+		if (state.rageActive(tick)) {
+			float heal = (float) (amount * state.rageLifesteal());
+			if (heal > 0 && player.getHealth() < player.getMaxHealth()) {
+				player.heal(heal);
+				arena.sendParticles(new DustParticleOptions(0x9C0A0A, 1.0f), player.getX(), player.getY() + 1.2, player.getZ(), 4, 0.3, 0.4, 0.3, 0);
+			}
 		} else {
-			double damage = config.amount();
-			for (LivingEntity entity : arena.getEntitiesOfClass(LivingEntity.class, box, e -> isEnemyOf(hero.team, e) || (e instanceof GoblinUnit u && owns(u) && u.team() != hero.team))) {
-				if (entity.distanceTo(player) > radius) {
-					continue;
-				}
-				if (entity instanceof GoblinUnit unit) {
-					unit.hurtByTeam(arena, arena.damageSources().playerAttack(player), (float) damage, hero.team);
-				} else {
-					entity.invulnerableTime = 0;
-					entity.hurtServer(arena, arena.damageSources().playerAttack(player), (float) damage);
-				}
-				shove(entity, entity.getX() - player.getX(), entity.getZ() - player.getZ(), 1.3);
-				entity.hurtMarked = true;
-			}
-			arena.sendParticles(ParticleTypes.EXPLOSION, player.getX(), player.getY() + 0.2, player.getZ(), 3, 1, 0.1, 1, 0);
-			arena.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.DIRT.defaultBlockState()),
-					player.getX(), player.getY() + 0.1, player.getZ(), 80, radius * 0.5, 0.1, radius * 0.5, 0.3);
-			arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ANVIL_LAND, SoundSource.PLAYERS, 0.7f, 0.6f);
-			arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.GENERIC_EXPLODE.value(), SoundSource.PLAYERS, 0.6f, 1.4f);
+			addRage(player, hero, amount * balance.rage().chargePerDamageDealt());
+		}
+	}
+
+	/** Der Häuptling hat Schaden eingesteckt: lädt die Raserei. */
+	private void onHeroTookDamage(ServerPlayer player, Hero hero, double amount) {
+		addRage(player, hero, amount * balance.rage().chargePerDamageTaken());
+	}
+
+	private void addRage(ServerPlayer player, Hero hero, double amount) {
+		TeamState state = teams.get(hero.team);
+		boolean wasFull = state.rageCharge() >= state.rageMax();
+		state.addRage(amount, tick);
+		if (!wasFull && state.rageCharge() >= state.rageMax()) {
+			player.sendOverlayMessage(Component.translatable("message.goblinforest.rage_ready",
+					Component.keybind("key.goblinforest.rage")).withStyle(ChatFormatting.GOLD));
+			playTo(player, SoundEvents.PIGLIN_BRUTE_ANGRY, 0.8f, 1.2f);
 		}
 	}
 
@@ -1528,6 +2020,12 @@ public final class Match {
 			shop.add(new MatchStatePayload.ShopEntry("cast:" + spell.id(), state.spellLevel(spell), config.maxLevel(), config.cost(),
 					config.unlockReputation(), state.checkCast(spell, tick).ordinal()));
 		}
+		for (AbilityType ability : AbilityType.values()) {
+			shop.add(new MatchStatePayload.ShopEntry("ability_rank:" + ability.id(), state.abilityRank(ability),
+					balance.ability(ability.id()).maxRank(), 1, 0, state.checkAbilityRank(ability).ordinal()));
+			shop.add(new MatchStatePayload.ShopEntry("ability:" + ability.id(), state.abilityRank(ability),
+					balance.ability(ability.id()).maxRank(), 0, 0, state.checkAbility(ability, tick).ordinal()));
+		}
 		List<MatchStatePayload.Cooldown> cooldowns = new ArrayList<>();
 		for (SpellType spell : SpellType.values()) {
 			cooldowns.add(new MatchStatePayload.Cooldown(spell.id(), (int) state.cooldownRemaining(spell.id(), tick), (int) state.cooldownLength(spell.id())));
@@ -1550,7 +2048,10 @@ public final class Match {
 				new float[] {(float) teams.get(TeamColor.RED).towerHealth(), (float) teams.get(TeamColor.GREEN).towerHealth()},
 				new float[] {(float) teams.get(TeamColor.RED).towerMaxHealth(), (float) teams.get(TeamColor.GREEN).towerMaxHealth()},
 				unitCounts, enemyUnits, enemyState.heroLevel(), enemyState.reputation(), rallyPoints.containsKey(team),
-				shop, cooldowns);
+				shop, cooldowns,
+				state.abilityPoints(), (float) (state.rageCharge() / state.rageMax()), (int) ((state.rageRemaining(tick) + 19) / 20),
+				phase == MatchPhase.BATTLE ? (int) secondsUntilSuddenDeath() : -1, (float) state.incomePerSecond(),
+				new int[] {roundWins(TeamColor.RED), roundWins(TeamColor.GREEN)}, bestOf());
 	}
 
 	/** Zeilen für {@code /gf status}. */
@@ -1585,7 +2086,38 @@ public final class Match {
 		return recruit(team, type);
 	}
 
+	/** Für den Selbsttest: Verbesserung kaufen, als hätte ein Spieler sie bestellt (inklusive Bauwerken). */
+	public PurchaseResult upgradeForTest(TeamColor team, UpgradeKey key) {
+		PurchaseResult result = teams.get(team).buyUpgrade(key);
+		if (result.ok()) {
+			onUpgradeBought(team, key);
+		}
+		return result;
+	}
+
+	/** Für den Selbsttest: Zauber ohne Häuptling auf einen Punkt wirken (bezahlt wie ein echter Zauber). */
+	public PurchaseResult castForTest(TeamColor team, SpellType spell, Vec3 target) {
+		TeamState state = teams.get(team);
+		PurchaseResult result = state.checkCast(spell, tick);
+		if (result.ok()) {
+			state.payCast(spell, tick);
+			releaseSpell(team, spell, target.add(0, 3, 0), target, null);
+		}
+		return result;
+	}
+
 	public int unitCount() {
 		return units.size();
+	}
+
+	/** Lebende Einheiten eines Typs (für den Selbsttest). */
+	public int unitCount(TeamColor team, UnitType type) {
+		int count = 0;
+		for (GoblinUnit unit : units) {
+			if (unit.isAlive() && unit.team() == team && unit.unitType() == type) {
+				count++;
+			}
+		}
+		return count;
 	}
 }

@@ -103,6 +103,24 @@ public final class ArenaLayout {
 		return new Point(side(team) * TOWER_X + 0.5, GROUND_Y + TOWER_HEIGHT + 1.5, TOWER_Z + 0.5);
 	}
 
+	/** Z-Position der Festungskanone auf der Frontmauer (neben dem Tor, in einer Schießscharte). */
+	public static final int CANNON_Z = -7;
+
+	/** Position der Kanone (Dispenser) oben auf der inneren Reihe der Frontmauer. */
+	public static Point cannonBlock(TeamColor team) {
+		return new Point(side(team) * (WALL_FRONT_X + 1), GROUND_Y + WALL_HEIGHT + 1, CANNON_Z);
+	}
+
+	/** Punkt, an dem die Kanonenkugel die Mündung verlässt. */
+	public static Point cannonMuzzle(TeamColor team) {
+		return new Point(side(team) * WALL_FRONT_X + 0.5, GROUND_Y + WALL_HEIGHT + 1.5, CANNON_Z + 0.5);
+	}
+
+	/** Mitte der Goldmine im Hof (für Funken und Anzeige). */
+	public static Point goldmine(TeamColor team) {
+		return new Point(side(team) * (WALL_FRONT_X + 11) + 0.5, GROUND_Y + 2, 11.5);
+	}
+
 	/** Sammelpunkt der Kaserne direkt hinter dem Tor, an dem neue Einheiten erscheinen. */
 	public static Point barracks(TeamColor team) {
 		return new Point(side(team) * (WALL_FRONT_X + 4) + 0.5, GROUND_Y + 1, 0.5);

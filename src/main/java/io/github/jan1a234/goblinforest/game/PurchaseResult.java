@@ -10,7 +10,9 @@ public enum PurchaseResult {
 	UNIT_CAP("unit_cap"),
 	ON_COOLDOWN("on_cooldown"),
 	NOT_AVAILABLE("not_available"),
-	HERO_DEAD("hero_dead");
+	HERO_DEAD("hero_dead"),
+	NO_ABILITY_POINTS("no_ability_points"),
+	NOT_CHARGED("not_charged");
 
 	private final String id;
 

@@ -1,6 +1,11 @@
 package io.github.jan1a234.goblinforest.client;
 
 import io.github.jan1a234.goblinforest.game.MatchPhase;
+import io.github.jan1a234.goblinforest.game.PurchaseResult;
+import io.github.jan1a234.goblinforest.hero.AbilityType;
+import io.github.jan1a234.goblinforest.spell.SpellType;
+import java.util.ArrayList;
+import java.util.List;
 import io.github.jan1a234.goblinforest.game.Stance;
 import io.github.jan1a234.goblinforest.game.TeamColor;
 import io.github.jan1a234.goblinforest.net.MatchStatePayload;
@@ -13,7 +18,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
 /**
- * Match-HUD: Ressourcen oben links, Festungen und Türme oben in der Mitte, Abklingzeiten unten rechts
+ * Match-HUD: Ressourcen oben links, Festungen und Türme oben in der Mitte (darunter Sudden Death und Runden),
+ * Zauber, Fähigkeiten und Raserei unten rechts
  * und eine eigene Lebensleiste des Häuptlings anstelle der Herzen.
  */
 public final class MatchHud {
@@ -46,6 +52,7 @@ public final class MatchHud {
 		drawStructures(g, font, s);
 		drawResources(g, font, s);
 		drawCooldowns(g, font, s);
+		drawNotices(g, font, s);
 		if (s.respawnSeconds() > 0) {
 			Component text = Component.translatable("hud.goblinforest.respawn", s.respawnSeconds());
 			g.centeredText(font, text, g.guiWidth() / 2, g.guiHeight() / 2 + 20, 0xFFFF6B5B);
@@ -99,6 +106,8 @@ public final class MatchHud {
 		if (gain > 0) {
 			g.text(font, "+" + gain, x + font.width(gold) + 4, y, 0xFFFFF59A, true);
 		}
+		String income = String.format("+%.1f/s", s.income());
+		g.text(font, income, x + w - font.width(income), y, 0xFFB8A050, true);
 		y += 12;
 		g.text(font, Component.translatable("hud.goblinforest.reputation", s.reputation()), x, y, REPUTATION, true);
 		bar(g, x + 60, y + 2, w - 60, 4, s.reputationProgress(), REPUTATION);
@@ -119,9 +128,15 @@ public final class MatchHud {
 		StringBuilder army = new StringBuilder();
 		for (UnitType type : UnitType.values()) {
 			int count = s.unitCounts().length > type.ordinal() ? s.unitCounts()[type.ordinal()] : 0;
-			army.append(Component.translatable(type.translationKey()).getString(), 0, 1).append(count).append("  ");
+			if (count > 0) {
+				army.append(Component.translatable(type.shortKey()).getString()).append(' ').append(count).append("  ");
+			}
 		}
-		g.text(font, army.toString().trim(), x, y, MUTED, true);
+		String armyText = army.isEmpty() ? Component.translatable("hud.goblinforest.no_army").getString() : army.toString().trim();
+		if (font.width(armyText) > w) {
+			armyText = font.plainSubstrByWidth(armyText, w - font.width("…")) + "…";
+		}
+		g.text(font, armyText, x, y, MUTED, true);
 		y += 12;
 		g.text(font, Component.translatable("hud.goblinforest.enemy", s.enemyUnits(), s.enemyHeroLevel(), s.enemyReputation()), x, y, 0xFFE09080, true);
 		y += 12;
@@ -129,41 +144,93 @@ public final class MatchHud {
 	}
 
 	private static void drawCooldowns(GuiGraphicsExtractor g, Font font, MatchStatePayload s) {
-		String[][] entries = {
-				{"fireball", "cast:fireball", "spell.goblinforest.fireball"},
-				{"healing", "cast:healing", "spell.goblinforest.healing"},
-				{"bloodlust", "ability:bloodlust", "ability.goblinforest.bloodlust"},
-				{"battleSlam", "ability:battleSlam", "ability.goblinforest.battleSlam"}};
-		int w = 128;
+		List<String[]> entries = new ArrayList<>();
+		for (SpellType spell : SpellType.values()) {
+			entries.add(new String[] {spell.id(), "cast:" + spell.id(), spell.translationKey()});
+		}
+		for (AbilityType ability : AbilityType.values()) {
+			entries.add(new String[] {ability.id(), "ability:" + ability.id(), ability.translationKey()});
+		}
+		int w = 150;
 		int x = g.guiWidth() - w - 6;
-		int y = g.guiHeight() - 6 - entries.length * 12;
-		panel(g, x - 4, y - 4, w + 8, entries.length * 12 + 6);
+		int y = g.guiHeight() - 6 - entries.size() * 12;
+		panel(g, x - 4, y - 4, w + 8, entries.size() * 12 + 6);
 		for (String[] entry : entries) {
+			boolean rage = AbilityType.RAGE.id().equals(entry[0]);
 			MatchStatePayload.Cooldown cooldown = s.cooldown(entry[0]);
 			MatchStatePayload.ShopEntry cast = s.shopEntry(entry[1]);
-			boolean locked = cast != null && cast.status() == io.github.jan1a234.goblinforest.game.PurchaseResult.REPUTATION_TOO_LOW.ordinal();
+			boolean isSpell = entry[1].startsWith("cast:");
+			boolean locked = isSpell && cast != null && cast.status() == PurchaseResult.REPUTATION_TOO_LOW.ordinal();
 			String key = ModKeys.label(entry[1]);
-			g.text(font, "[" + key + "] ", x, y, MUTED, true);
-			int nameX = x + font.width("[" + key + "] ");
+			String keyText = key.isEmpty() ? "" : "[" + key + "] ";
+			g.text(font, keyText, x, y, MUTED, true);
+			int nameX = x + font.width(keyText);
 			int remaining = cooldown == null ? 0 : cooldown.remaining();
-			int color = locked ? 0xFF707070 : remaining > 0 ? MUTED : TEXT;
-			g.text(font, Component.translatable(entry[2]), nameX, y, color, true);
 			String right;
 			int rightColor;
-			if (locked) {
+			int nameColor = TEXT;
+			if (rage) {
+				if (s.rageSeconds() > 0) {
+					right = s.rageSeconds() + "s";
+					rightColor = 0xFFFF4020;
+					nameColor = 0xFFFF6040;
+					bar(g, nameX, y + 9, x + w - nameX, 1, 1f, 0xFFFF4020);
+				} else if (s.rageCharge() >= 1f) {
+					right = "✔";
+					rightColor = (ClientMatchState.ticks() / 5) % 2 == 0 ? 0xFFFF4020 : 0xFFFFB060;
+				} else {
+					right = Math.round(s.rageCharge() * 100) + "%";
+					rightColor = MUTED;
+					nameColor = MUTED;
+					bar(g, nameX, y + 9, x + w - nameX, 1, s.rageCharge(), 0xFFD0301A);
+				}
+			} else if (locked) {
 				right = Component.translatable("hud.goblinforest.locked", cast.reputation()).getString();
 				rightColor = 0xFF707070;
+				nameColor = 0xFF707070;
 			} else if (remaining > 0) {
 				right = ((remaining + 19) / 20) + "s";
 				rightColor = 0xFFFFB060;
+				nameColor = MUTED;
 				float progress = cooldown.total() <= 0 ? 0 : 1f - remaining / (float) cooldown.total();
 				g.fill(nameX, y + 9, nameX + (int) ((x + w - nameX) * progress), y + 10, 0xFFFFB060);
 			} else {
-				right = cast != null ? cast.cost() + "g" : "✔";
-				rightColor = cast != null && cast.status() == io.github.jan1a234.goblinforest.game.PurchaseResult.NOT_ENOUGH_GOLD.ordinal() ? 0xFFFF6B5B : 0xFF8BD449;
+				right = isSpell && cast != null ? cast.cost() + "g" : "✔";
+				rightColor = isSpell && cast != null && cast.status() == PurchaseResult.NOT_ENOUGH_GOLD.ordinal() ? 0xFFFF6B5B : 0xFF8BD449;
 			}
+			Component name = Component.translatable(entry[2]);
+			int maxName = x + w - font.width(right) - 4 - nameX;
+			String nameText = name.getString();
+			if (font.width(nameText) > maxName) {
+				nameText = font.plainSubstrByWidth(nameText, maxName - font.width("…")) + "…";
+			}
+			g.text(font, nameText, nameX, y, nameColor, true);
 			g.text(font, right, x + w - font.width(right), y, rightColor, true);
 			y += 12;
+		}
+	}
+
+	/** Hinweise in der Bildschirmmitte oben: Sudden Death, Best-of-Stand, freie Fähigkeitspunkte. */
+	private static void drawNotices(GuiGraphicsExtractor g, Font font, MatchStatePayload s) {
+		int cx = g.guiWidth() / 2;
+		int y = 36;
+		if (s.bestOf() > 1) {
+			Component rounds = Component.translatable("hud.goblinforest.rounds", s.roundWins()[0], s.roundWins()[1], s.bestOf());
+			g.centeredText(font, rounds, cx, y, TEXT);
+			y += 11;
+		}
+		if (s.suddenDeath()) {
+			boolean blink = (ClientMatchState.ticks() / 10) % 2 == 0;
+			g.centeredText(font, Component.translatable("hud.goblinforest.sudden_death"), cx, y, blink ? 0xFFFF3020 : 0xFFB02010);
+			y += 11;
+		} else if (s.suddenDeathSeconds() > 0 && s.suddenDeathSeconds() <= 180) {
+			String time = String.format("%d:%02d", s.suddenDeathSeconds() / 60, s.suddenDeathSeconds() % 60);
+			g.centeredText(font, Component.translatable("hud.goblinforest.sudden_death_in", time), cx, y, 0xFFFF8060);
+			y += 11;
+		}
+		if (s.abilityPoints() > 0 && s.respawnSeconds() <= 0) {
+			g.centeredText(font, Component.translatable("hud.goblinforest.ability_points", s.abilityPoints(),
+					ModKeys.MENU.getTranslatedKeyMessage()), cx, y, GOLD);
 		}
 	}
 

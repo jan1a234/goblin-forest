@@ -8,11 +8,16 @@ import io.github.jan1a234.goblinforest.game.PurchaseResult;
 import io.github.jan1a234.goblinforest.game.Structure;
 import io.github.jan1a234.goblinforest.game.TeamColor;
 import io.github.jan1a234.goblinforest.game.TeamState;
+import io.github.jan1a234.goblinforest.spell.SpellType;
 import io.github.jan1a234.goblinforest.unit.UnitType;
+import io.github.jan1a234.goblinforest.upgrade.UpgradeKey;
+import io.github.jan1a234.goblinforest.upgrade.UpgradeType;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Spielt auf einem echten Minecraft-Server ein Match ohne Spieler durch: Arena bauen, Countdown,
@@ -39,6 +44,8 @@ public class MatchGameTest {
 					} else if (match.phase() == MatchPhase.BATTLE) {
 						checkArenaBuilt(helper, arena);
 						recruitArmies(helper, match);
+						buildStrongholds(helper, match, arena);
+						castSpells(helper, match);
 						stage[0] = 1;
 					}
 				}
@@ -71,14 +78,57 @@ public class MatchGameTest {
 	}
 
 	private static void recruitArmies(GameTestHelper helper, Match match) {
+		UnitType[] army = {UnitType.WARRIOR, UnitType.WARRIOR, UnitType.ARCHER, UnitType.SLAVE, UnitType.WARRIOR, UnitType.ARCHER,
+				UnitType.ASSASSIN, UnitType.SHAMAN, UnitType.WOLF_RIDER, UnitType.TROLL, UnitType.CATAPULT};
 		for (TeamColor team : TeamColor.values()) {
-			match.grantGold(team, 5000);
-			for (UnitType type : new UnitType[] {UnitType.WARRIOR, UnitType.WARRIOR, UnitType.ARCHER, UnitType.SLAVE, UnitType.WARRIOR, UnitType.ARCHER}) {
+			match.grantGold(team, 20000);
+			// Ruf 5: alles freigeschaltet
+			match.team(team).addClanXp(400 * 5);
+			for (int i = 0; i < 3; i++) {
+				PurchaseResult huts = match.upgradeForTest(team, UpgradeKey.stronghold(UpgradeType.HUTS));
+				helper.assertTrue(huts.ok(), "Hütten für " + team + ": " + huts);
+			}
+			for (UnitType type : army) {
 				PurchaseResult result = match.recruitForTest(team, type);
 				helper.assertTrue(result.ok(), "Rekrutieren von " + type + " für " + team + " fehlgeschlagen: " + result);
 			}
+			for (UnitType type : UnitType.values()) {
+				helper.assertTrue(match.unitCount(team, type) > 0, "Keine Einheit vom Typ " + type + " für " + team);
+			}
 		}
-		helper.assertTrue(match.unitCount() == 2 * 8, "Erwartet 16 Goblins, gefunden " + match.unitCount());
+		helper.assertTrue(match.unitCount() == 2 * 13, "Erwartet 26 Goblins, gefunden " + match.unitCount());
+	}
+
+	/** Kanone, Goldmine, Ausbildung und Ausdauer kaufen und prüfen, dass die Bauwerke in der Arena stehen. */
+	private static void buildStrongholds(GameTestHelper helper, Match match, ServerLevel arena) {
+		for (TeamColor team : TeamColor.values()) {
+			for (UpgradeType type : new UpgradeType[] {UpgradeType.CANNON, UpgradeType.GOLDMINE, UpgradeType.GOLDMINE, UpgradeType.TRAINING, UpgradeType.ENDURANCE}) {
+				PurchaseResult result = match.upgradeForTest(team, UpgradeKey.stronghold(type));
+				helper.assertTrue(result.ok(), type + " für " + team + ": " + result);
+			}
+			ArenaLayout.Point cannon = ArenaLayout.cannonBlock(team);
+			helper.assertTrue(arena.getBlockState(BlockPos.containing(cannon.x(), cannon.y(), cannon.z())).is(Blocks.DISPENSER), "Kanone " + team + " fehlt");
+			ArenaLayout.Point mine = ArenaLayout.goldmine(team);
+			helper.assertTrue(arena.getBlockState(BlockPos.containing(mine.x(), mine.y(), mine.z())).is(Blocks.RAW_GOLD_BLOCK), "Goldmine " + team + " fehlt");
+			helper.assertTrue(match.team(team).incomePerSecond() > 3.5, "Goldmine bringt kein Einkommen");
+			helper.assertTrue(match.team(team).startingUnitLevel(5) == 2, "Ausbildung wirkt nicht");
+		}
+		// Neue Einheiten mit Ausbildung starten als Kämpfer
+		PurchaseResult trained = match.recruitForTest(TeamColor.RED, UnitType.WARRIOR);
+		helper.assertTrue(trained.ok(), "Rekrutieren nach Ausbildung: " + trained);
+	}
+
+	/** Alle Zauber einmal wirken; die Effekte laufen zeitversetzt weiter und dürfen das Match nicht abbrechen. */
+	private static void castSpells(GameTestHelper helper, Match match) {
+		Vec3 bridge = new Vec3(0.5, ArenaLayout.GROUND_Y + 1, 0.5);
+		for (SpellType spell : SpellType.values()) {
+			TeamColor caster = spell == SpellType.HEALING ? TeamColor.GREEN : TeamColor.RED;
+			PurchaseResult result = match.castForTest(caster, spell, bridge);
+			helper.assertTrue(result.ok(), "Zauber " + spell + " fehlgeschlagen: " + result);
+		}
+		Vec3 greenBarracks = new Vec3(ArenaLayout.barracks(TeamColor.GREEN).x(), ArenaLayout.GROUND_Y + 1, 0.5);
+		PurchaseResult again = match.castForTest(TeamColor.RED, SpellType.FIREBALL, greenBarracks);
+		helper.assertTrue(again == PurchaseResult.ON_COOLDOWN, "Feuerball sollte Abklingzeit haben, war " + again);
 	}
 
 	private static void destroyGreen(GameTestHelper helper, Match match) {

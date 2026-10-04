@@ -38,7 +38,14 @@ public record MatchStatePayload(
 		int enemyReputation,
 		boolean rallySet,
 		List<ShopEntry> shop,
-		List<Cooldown> cooldowns
+		List<Cooldown> cooldowns,
+		int abilityPoints,
+		float rageCharge,
+		int rageSeconds,
+		int suddenDeathSeconds,
+		float income,
+		int[] roundWins,
+		int bestOf
 ) implements CustomPacketPayload {
 	public static final Type<MatchStatePayload> TYPE = new Type<>(GoblinForest.id("match_state"));
 	public static final StreamCodec<FriendlyByteBuf, MatchStatePayload> CODEC = CustomPacketPayload.codec(MatchStatePayload::write, MatchStatePayload::read);
@@ -46,7 +53,13 @@ public record MatchStatePayload(
 	/** Leerer Zustand: kein Match. */
 	public static MatchStatePayload none() {
 		return new MatchStatePayload(0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
-				new float[2], new float[2], new float[2], new float[2], new int[4], 0, 1, 0, false, List.of(), List.of());
+				new float[2], new float[2], new float[2], new float[2], new int[8], 0, 1, 0, false, List.of(), List.of(),
+				0, 0, 0, -1, 0, new int[2], 1);
+	}
+
+	/** Läuft gerade der Sudden Death (Festungskerne verlieren Leben)? */
+	public boolean suddenDeath() {
+		return suddenDeathSeconds == 0;
 	}
 
 	public boolean inMatch() {
@@ -105,6 +118,14 @@ public record MatchStatePayload(
 			buf.writeVarInt(cooldown.remaining());
 			buf.writeVarInt(cooldown.total());
 		}
+		buf.writeVarInt(abilityPoints);
+		buf.writeFloat(rageCharge);
+		buf.writeVarInt(rageSeconds);
+		buf.writeVarInt(suddenDeathSeconds + 1);
+		buf.writeFloat(income);
+		buf.writeVarInt(roundWins[0]);
+		buf.writeVarInt(roundWins[1]);
+		buf.writeVarInt(bestOf);
 	}
 
 	private static MatchStatePayload read(FriendlyByteBuf buf) {
@@ -134,7 +155,7 @@ public record MatchStatePayload(
 		int enemyHeroLevel = buf.readVarInt();
 		int enemyReputation = buf.readVarInt();
 		boolean rallySet = buf.readBoolean();
-		int shopSize = Math.min(64, buf.readVarInt());
+		int shopSize = Math.min(128, buf.readVarInt());
 		List<ShopEntry> shop = new ArrayList<>(shopSize);
 		for (int i = 0; i < shopSize; i++) {
 			shop.add(new ShopEntry(buf.readUtf(64), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt()));
@@ -144,9 +165,17 @@ public record MatchStatePayload(
 		for (int i = 0; i < cooldownSize; i++) {
 			cooldowns.add(new Cooldown(buf.readUtf(64), buf.readVarInt(), buf.readVarInt()));
 		}
+		int abilityPoints = buf.readVarInt();
+		float rageCharge = buf.readFloat();
+		int rageSeconds = buf.readVarInt();
+		int suddenDeathSeconds = buf.readVarInt() - 1;
+		float income = buf.readFloat();
+		int[] roundWins = {buf.readVarInt(), buf.readVarInt()};
+		int bestOf = buf.readVarInt();
 		return new MatchStatePayload(phase, team, phaseSeconds, matchSeconds, gold, reputation, reputationProgress, population,
 				populationLimit, stance, heroLevel, heroProgress, respawnSeconds, arrays[0], arrays[1], arrays[2], arrays[3],
-				unitCounts, enemyUnits, enemyHeroLevel, enemyReputation, rallySet, shop, cooldowns);
+				unitCounts, enemyUnits, enemyHeroLevel, enemyReputation, rallySet, shop, cooldowns,
+				abilityPoints, rageCharge, rageSeconds, suddenDeathSeconds, income, roundWins, bestOf);
 	}
 
 	@Override

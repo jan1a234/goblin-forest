@@ -70,6 +70,11 @@ public final class MatchManager {
 			}
 			return true;
 		});
+		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamage, damageTaken, blocked) -> {
+			if (match != null && entity instanceof ServerPlayer player && match.isMember(player.getUUID())) {
+				match.onHeroDamaged(player, source, damageTaken);
+			}
+		});
 		ServerLivingEntityEvents.ALLOW_DEATH.register((entity, source, amount) -> {
 			if (match != null && entity instanceof ServerPlayer player && match.isMember(player.getUUID())) {
 				return match.onHeroDeath(player, source);

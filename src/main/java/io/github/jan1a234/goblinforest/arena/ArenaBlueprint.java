@@ -36,6 +36,9 @@ public final class ArenaBlueprint {
 		SHROOMLIGHT(true), LANTERN(false), HAY_BLOCK(true), IRON_BARS(true),
 		SHORT_GRASS(false), FERN(false), RED_MUSHROOM(false), BROWN_MUSHROOM(false), LILY_PAD(false), MOSS_CARPET(false),
 		RED_MUSHROOM_BLOCK(true), MUSHROOM_STEM(true),
+		GOLD_ORE(true), RAW_GOLD_BLOCK(true), RAIL(false), CHAIN(false),
+		/** Kanone der Festung; zeigt immer Richtung Gegner. */
+		DISPENSER(true),
 		/** Wird je nach Seite durch einen Block in der Clanfarbe ersetzt. */
 		TEAM_ACCENT(true);
 
@@ -538,6 +541,65 @@ public final class ArenaBlueprint {
 	}
 
 	// ---------------------------------------------------------------- Turm und Kern (auch für Schadensstufen)
+
+	/** Festungskanone auf der Frontmauer: Dispenser in der Schießscharte, ab Stufe 3 mit Pulverfass und Laterne. */
+	public static List<Placement> cannonBlocks(TeamColor team, int level) {
+		List<Placement> out = new ArrayList<>();
+		int s = side(team);
+		int x = s * (WALL_FRONT_X + 1);
+		int y = GROUND_Y + WALL_HEIGHT + 1;
+		int z = CANNON_Z;
+		boolean built = level > 0;
+		out.add(new Placement(x, y, z, built ? Material.DISPENSER : Material.AIR));
+		out.add(new Placement(x, y, z - 1, level >= 2 ? Material.SPRUCE_SLAB : Material.AIR));
+		out.add(new Placement(x, y, z + 1, level >= 2 ? Material.SPRUCE_SLAB : Material.AIR));
+		out.add(new Placement(x, y + 1, z, level >= 3 ? Material.LANTERN : Material.AIR));
+		out.add(new Placement(x, y, z - 2, level >= 4 ? Material.HAY_BLOCK : Material.AIR));
+		return out;
+	}
+
+	/**
+	 * Goldmine im Hof: ein Erzhügel mit Stolleneingang und Lorenschiene. Jede Stufe macht den Hügel größer
+	 * und goldener; Stufe 0 ist leerer Boden.
+	 */
+	public static List<Placement> goldmineBlocks(TeamColor team, int level) {
+		List<Placement> out = new ArrayList<>();
+		int s = side(team);
+		int ax0 = WALL_FRONT_X + 10;
+		int z0 = 10;
+		for (int dax = 0; dax < 3; dax++) {
+			for (int dz = 0; dz < 3; dz++) {
+				int x = s * (ax0 + dax);
+				int z = z0 + dz;
+				boolean center = dax == 1 && dz == 1;
+				boolean corner = (dax == 0 || dax == 2) && (dz == 0 || dz == 2);
+				Material base = Material.AIR;
+				Material middle = Material.AIR;
+				Material top = Material.AIR;
+				if (level >= 1) {
+					base = center || chance(x, z, 501) < 0.35 ? Material.GOLD_ORE : Material.COBBLESTONE;
+					middle = center ? Material.GOLD_ORE : Material.AIR;
+				}
+				if (level >= 2) {
+					middle = corner ? Material.AIR : center ? Material.RAW_GOLD_BLOCK : Material.GOLD_ORE;
+					top = center ? Material.LANTERN : Material.AIR;
+				}
+				if (level >= 3) {
+					middle = corner ? Material.GOLD_ORE : center ? Material.RAW_GOLD_BLOCK : Material.GILDED_BLACKSTONE;
+					top = center ? Material.RAW_GOLD_BLOCK : corner ? Material.AIR : Material.GOLD_ORE;
+				}
+				out.add(new Placement(x, GROUND_Y + 1, z, base));
+				out.add(new Placement(x, GROUND_Y + 2, z, middle));
+				out.add(new Placement(x, GROUND_Y + 3, z, top));
+			}
+		}
+		out.add(new Placement(s * (ax0 + 1), GROUND_Y + 4, z0 + 1, level >= 3 ? Material.LANTERN : Material.AIR));
+		// Lorenschiene vom Hügel Richtung Hofmitte
+		for (int z = z0 - 3; z < z0; z++) {
+			out.add(new Placement(s * (ax0 + 1), GROUND_Y + 1, z, level >= 1 ? Material.RAIL : Material.AIR));
+		}
+		return out;
+	}
 
 	/** Alle Blöcke des Wachturms; zerstört bleibt nur ein Stumpf mit Trümmern. */
 	public static List<Placement> towerBlocks(TeamColor team, boolean destroyed) {

@@ -31,8 +31,8 @@ class UnitCombatTest {
 
 	@Test
 	void bloodlustSpeedsUpAttacks() {
-		assertEquals(22, combat.attackCooldownTicks(UnitType.WARRIOR, false));
-		assertEquals(17, combat.attackCooldownTicks(UnitType.WARRIOR, true));
+		assertEquals(22, combat.attackCooldownTicks(UnitType.WARRIOR, 0.0));
+		assertEquals(17, combat.attackCooldownTicks(UnitType.WARRIOR, 0.3));
 	}
 
 	@Test

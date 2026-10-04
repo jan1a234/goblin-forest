@@ -183,4 +183,150 @@ class TeamStateTest {
 		team.addHeroXp(1_000_000);
 		assertEquals(10, team.heroLevel());
 	}
+
+	@Test
+	void heroLevelsGrantAbilityPoints() {
+		TeamState team = fresh();
+		assertEquals(0, team.abilityPoints());
+		assertEquals(PurchaseResult.NO_ABILITY_POINTS, team.buyAbilityRank(AbilityType.BATTLE_SLAM));
+		team.addHeroXp(150);
+		assertEquals(3, team.heroLevel());
+		assertEquals(2, team.abilityPoints());
+		assertEquals(PurchaseResult.OK, team.buyAbilityRank(AbilityType.BATTLE_SLAM));
+		assertEquals(PurchaseResult.OK, team.buyAbilityRank(AbilityType.BATTLE_SLAM));
+		assertEquals(2, team.abilityRank(AbilityType.BATTLE_SLAM));
+		assertEquals(0, team.abilityPoints());
+		assertEquals(PurchaseResult.NO_ABILITY_POINTS, team.buyAbilityRank(AbilityType.BLOODLUST));
+	}
+
+	@Test
+	void abilityRanksAreCapped() {
+		TeamState team = fresh();
+		team.addHeroXp(100_000);
+		for (int i = 0; i < 3; i++) {
+			assertEquals(PurchaseResult.OK, team.buyAbilityRank(AbilityType.BLOODLUST));
+		}
+		assertEquals(PurchaseResult.MAX_LEVEL, team.buyAbilityRank(AbilityType.BLOODLUST));
+	}
+
+	@Test
+	void abilityRankShortensCooldown() {
+		TeamState team = fresh();
+		team.addHeroXp(60);
+		team.buyAbilityRank(AbilityType.BATTLE_SLAM);
+		team.startAbilityCooldown(AbilityType.BATTLE_SLAM, 0);
+		// 15 s minus 1 s für Rang 1
+		assertEquals(PurchaseResult.ON_COOLDOWN, team.checkAbility(AbilityType.BATTLE_SLAM, 279));
+		assertEquals(PurchaseResult.OK, team.checkAbility(AbilityType.BATTLE_SLAM, 280));
+	}
+
+	@Test
+	void rageChargesInCombatAndThenRuns() {
+		TeamState team = fresh();
+		assertEquals(PurchaseResult.NOT_CHARGED, team.checkAbility(AbilityType.RAGE, 0));
+		team.addRage(60, 0);
+		assertEquals(PurchaseResult.NOT_CHARGED, team.checkAbility(AbilityType.RAGE, 0));
+		team.addRage(60, 0);
+		assertEquals(100, team.rageCharge(), 1e-9);
+		assertEquals(PurchaseResult.OK, team.checkAbility(AbilityType.RAGE, 0));
+		assertEquals(1.0, team.heroDamageMultiplier(0), 1e-9);
+		team.startAbilityCooldown(AbilityType.RAGE, 0);
+		assertTrue(team.rageActive(10));
+		assertEquals(0, team.rageCharge(), 1e-9);
+		assertEquals(1.6, team.heroDamageMultiplier(10), 1e-9);
+		assertEquals(PurchaseResult.ON_COOLDOWN, team.checkAbility(AbilityType.RAGE, 10));
+		// keine Ladung während der Raserei
+		team.addRage(50, 10);
+		assertEquals(0, team.rageCharge(), 1e-9);
+		assertFalse(team.rageActive(200));
+		assertEquals(1.0, team.heroDamageMultiplier(200), 1e-9);
+	}
+
+	@Test
+	void rageRanksExtendDurationAndLifesteal() {
+		TeamState team = fresh();
+		team.addHeroXp(60);
+		team.buyAbilityRank(AbilityType.RAGE);
+		team.addRage(100, 0);
+		team.startAbilityCooldown(AbilityType.RAGE, 0);
+		assertTrue(team.rageActive(239));
+		assertFalse(team.rageActive(240));
+		assertEquals(0.25, team.rageLifesteal(), 1e-9);
+		assertEquals(1.7, team.heroDamageMultiplier(0), 1e-9);
+		team.endRage();
+		assertFalse(team.rageActive(1));
+	}
+
+	@Test
+	void goldmineRaisesIncome() {
+		TeamState team = fresh();
+		team.addGold(1000);
+		assertEquals(PurchaseResult.OK, team.buyUpgrade(UpgradeKey.stronghold(UpgradeType.GOLDMINE)));
+		assertEquals(3.0, team.incomePerSecond(), 1e-9);
+		int before = team.gold();
+		for (int i = 0; i < 20 * 10; i++) {
+			team.tickIncome();
+		}
+		assertEquals(before + 30, team.gold());
+	}
+
+	@Test
+	void trainingRaisesStartingLevel() {
+		TeamState team = fresh();
+		team.addGold(5000);
+		assertEquals(1, team.startingUnitLevel(5));
+		assertEquals(PurchaseResult.REPUTATION_TOO_LOW, team.buyUpgrade(UpgradeKey.stronghold(UpgradeType.TRAINING)));
+		team.addClanXp(400 * 3);
+		assertEquals(PurchaseResult.OK, team.buyUpgrade(UpgradeKey.stronghold(UpgradeType.TRAINING)));
+		assertEquals(2, team.startingUnitLevel(5));
+		assertEquals(PurchaseResult.OK, team.buyUpgrade(UpgradeKey.stronghold(UpgradeType.TRAINING)));
+		assertEquals(3, team.startingUnitLevel(5));
+		assertEquals(3, team.startingUnitLevel(3));
+	}
+
+	@Test
+	void enduranceBoostsWholeArmy() {
+		TeamState team = fresh();
+		team.addGold(5000);
+		team.addClanXp(400 * 2);
+		team.buyUpgrade(UpgradeKey.stronghold(UpgradeType.ENDURANCE));
+		team.buyUpgrade(UpgradeKey.stronghold(UpgradeType.ENDURANCE));
+		assertEquals(1.2, team.armySpeedMultiplier(), 1e-9);
+		assertEquals(1.2, team.armyHealthMultiplier(), 1e-9);
+	}
+
+	@Test
+	void cannonNeedsReputation() {
+		TeamState team = fresh();
+		team.addGold(5000);
+		assertFalse(team.hasCannon());
+		assertEquals(PurchaseResult.REPUTATION_TOO_LOW, team.buyUpgrade(UpgradeKey.stronghold(UpgradeType.CANNON)));
+		team.addClanXp(400);
+		assertEquals(PurchaseResult.OK, team.buyUpgrade(UpgradeKey.stronghold(UpgradeType.CANNON)));
+		assertTrue(team.hasCannon());
+	}
+
+	@Test
+	void newUnitsUnlockByReputation() {
+		TeamState team = fresh();
+		team.addGold(5000);
+		assertEquals(PurchaseResult.REPUTATION_TOO_LOW, team.checkRecruit(UnitType.SHAMAN, 0));
+		assertEquals(PurchaseResult.REPUTATION_TOO_LOW, team.checkRecruit(UnitType.CATAPULT, 0));
+		team.addClanXp(400 * 4);
+		assertEquals(4, team.reputation());
+		for (UnitType type : UnitType.values()) {
+			assertEquals(PurchaseResult.OK, team.checkRecruit(type, 0), type.id());
+		}
+	}
+
+	@Test
+	void newSpellsUnlockByReputation() {
+		TeamState team = fresh();
+		team.addGold(5000);
+		assertEquals(PurchaseResult.REPUTATION_TOO_LOW, team.checkCast(SpellType.ROOTS, 0));
+		team.addClanXp(400 * 5);
+		for (SpellType spell : SpellType.values()) {
+			assertEquals(PurchaseResult.OK, team.checkCast(spell, 0), spell.id());
+		}
+	}
 }

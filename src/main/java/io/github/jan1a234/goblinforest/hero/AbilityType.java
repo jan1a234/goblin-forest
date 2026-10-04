@@ -5,7 +5,9 @@ public enum AbilityType {
 	/** Eigene Einheiten in der Nähe greifen eine Zeit lang schneller an. */
 	BLOODLUST("bloodlust"),
 	/** Flächenschlag um den Häuptling, schleudert Gegner zurück. */
-	BATTLE_SLAM("battleSlam");
+	BATTLE_SLAM("battleSlam"),
+	/** Lädt sich durch Kampf auf; gezündet: mehr Schaden, mehr Tempo und Lebensraub. */
+	RAGE("rage");
 
 	private final String id;
 
@@ -19,6 +21,11 @@ public enum AbilityType {
 
 	public String translationKey() {
 		return "ability.goblinforest." + id;
+	}
+
+	/** Raserei hat keine Abklingzeit, sondern eine Ladeleiste. */
+	public boolean charged() {
+		return this == RAGE;
 	}
 
 	public static AbilityType byId(String id) {

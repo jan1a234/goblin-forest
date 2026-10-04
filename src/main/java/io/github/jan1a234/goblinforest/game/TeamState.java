@@ -30,6 +30,9 @@ public final class TeamState {
 
 	private final Map<UpgradeKey, Integer> upgrades = new HashMap<>();
 	private final EnumMap<SpellType, Integer> spellLevels = new EnumMap<>(SpellType.class);
+	private final EnumMap<AbilityType, Integer> abilityRanks = new EnumMap<>(AbilityType.class);
+	private double rageCharge;
+	private long rageUntil = -1;
 	private final Map<String, Long> cooldownUntil = new HashMap<>();
 	private final Map<String, Long> cooldownLength = new HashMap<>();
 
@@ -47,6 +50,9 @@ public final class TeamState {
 		this.towerHealth = balance.stronghold().towerHealth();
 		for (SpellType spell : SpellType.values()) {
 			spellLevels.put(spell, 1);
+		}
+		for (AbilityType ability : AbilityType.values()) {
+			abilityRanks.put(ability, 0);
 		}
 	}
 
@@ -77,9 +83,17 @@ public final class TeamState {
 		stats.goldSpent += cost;
 	}
 
-	/** Passives Einkommen für einen Tick. */
+	/** Passives Einkommen pro Sekunde: Grundeinkommen plus Goldmine. */
+	public double incomePerSecond() {
+		Balance.UpgradeTrack mine = balance.upgrade(UpgradeType.GOLDMINE.id());
+		return balance.economy().passiveGoldPerSecond() + mine.valuePerLevel() * strongholdUpgrade(UpgradeType.GOLDMINE);
+	}
+
+	/** Passives Einkommen für einen Tick. Zählt als verdientes Gold für die Statistik. */
 	public void tickIncome() {
-		gold += balance.economy().passiveGoldPerSecond() / 20.0;
+		double amount = incomePerSecond() / 20.0;
+		gold += amount;
+		stats.goldEarned += amount;
 	}
 
 	// --- Erfahrung und Ruf ---
@@ -206,6 +220,32 @@ public final class TeamState {
 		return level(UpgradeKey.stronghold(type));
 	}
 
+	/** Stufe eines Armee-Upgrades (Ausbildung, Ausdauer). */
+	public int armyUpgrade(UpgradeType type) {
+		return level(UpgradeKey.stronghold(type));
+	}
+
+	/** Level, mit dem neue Einheiten dank Ausbildung starten (ab 1). */
+	public int startingUnitLevel(int maxLevel) {
+		Balance.UpgradeTrack training = balance.upgrade(UpgradeType.TRAINING.id());
+		int bonus = (int) Math.round(training.valuePerLevel() * armyUpgrade(UpgradeType.TRAINING));
+		return Math.clamp(1 + bonus, 1, maxLevel);
+	}
+
+	/** Tempofaktor der Armee durch Ausdauer, z. B. 1,2 auf Stufe 2. */
+	public double armySpeedMultiplier() {
+		return 1.0 + balance.upgrade(UpgradeType.ENDURANCE.id()).valuePerLevel() * armyUpgrade(UpgradeType.ENDURANCE);
+	}
+
+	/** Lebensfaktor der Armee durch Ausdauer (gleicher Wert wie das Tempo). */
+	public double armyHealthMultiplier() {
+		return armySpeedMultiplier();
+	}
+
+	public boolean hasCannon() {
+		return strongholdUpgrade(UpgradeType.CANNON) > 0;
+	}
+
 	public boolean isApplicable(UpgradeKey key) {
 		return key.type().scope() != UpgradeType.Scope.RANGED_UNIT || balance.unit(key.unit()).ranged();
 	}
@@ -326,11 +366,107 @@ public final class TeamState {
 	// --- Fähigkeiten ---
 
 	public PurchaseResult checkAbility(AbilityType ability, long now) {
+		if (ability.charged()) {
+			if (rageActive(now)) {
+				return PurchaseResult.ON_COOLDOWN;
+			}
+			return rageCharge >= rageMax() ? PurchaseResult.OK : PurchaseResult.NOT_CHARGED;
+		}
 		return cooldownRemaining(ability.id(), now) > 0 ? PurchaseResult.ON_COOLDOWN : PurchaseResult.OK;
 	}
 
 	public void startAbilityCooldown(AbilityType ability, long now) {
-		startCooldown(ability.id(), now, balance.ability(ability.id()).cooldownSeconds() * 20L);
+		if (ability.charged()) {
+			startRage(now);
+			return;
+		}
+		startCooldown(ability.id(), now, balance.ability(ability.id()).cooldownTicksAt(abilityRank(ability)));
+	}
+
+	// --- Fähigkeitspunkte (ein Punkt pro Häuptlingsstufe ab Stufe 2) ---
+
+	public int abilityRank(AbilityType ability) {
+		return abilityRanks.get(ability);
+	}
+
+	public int abilityPointsEarned() {
+		return heroLevel() - 1;
+	}
+
+	public int abilityPointsSpent() {
+		int spent = 0;
+		for (int rank : abilityRanks.values()) {
+			spent += rank;
+		}
+		return spent;
+	}
+
+	public int abilityPoints() {
+		return Math.max(0, abilityPointsEarned() - abilityPointsSpent());
+	}
+
+	public PurchaseResult checkAbilityRank(AbilityType ability) {
+		if (abilityRank(ability) >= balance.ability(ability.id()).maxRank()) {
+			return PurchaseResult.MAX_LEVEL;
+		}
+		if (abilityPoints() <= 0) {
+			return PurchaseResult.NO_ABILITY_POINTS;
+		}
+		return PurchaseResult.OK;
+	}
+
+	public PurchaseResult buyAbilityRank(AbilityType ability) {
+		PurchaseResult result = checkAbilityRank(ability);
+		if (result.ok()) {
+			abilityRanks.merge(ability, 1, Integer::sum);
+		}
+		return result;
+	}
+
+	// --- Raserei ---
+
+	public double rageCharge() {
+		return rageCharge;
+	}
+
+	public double rageMax() {
+		return balance.rage().maxCharge();
+	}
+
+	/** Lädt die Raserei auf (nicht während sie aktiv ist). */
+	public void addRage(double amount, long now) {
+		if (amount <= 0 || rageActive(now)) {
+			return;
+		}
+		rageCharge = Math.min(rageMax(), rageCharge + amount);
+	}
+
+	public boolean rageActive(long now) {
+		return now < rageUntil;
+	}
+
+	public long rageRemaining(long now) {
+		return Math.max(0, rageUntil - now);
+	}
+
+	/** Zündet die Raserei: Ladung verbraucht, aktiv für die Dauer des aktuellen Rangs. */
+	public void startRage(long now) {
+		rageCharge = 0;
+		rageUntil = now + balance.ability(AbilityType.RAGE.id()).durationTicksAt(abilityRank(AbilityType.RAGE));
+	}
+
+	/** Beendet eine laufende Raserei sofort (z. B. wenn der Häuptling fällt). */
+	public void endRage() {
+		rageUntil = -1;
+	}
+
+	/** Schadensfaktor des Häuptlings (1.6 während der Raserei mit Standardwerten, +0.1 je Rang). */
+	public double heroDamageMultiplier(long now) {
+		return rageActive(now) ? 1.0 + balance.ability(AbilityType.RAGE.id()).amountAt(abilityRank(AbilityType.RAGE)) : 1.0;
+	}
+
+	public double rageLifesteal() {
+		return balance.rage().lifesteal() + balance.rage().lifestealPerRank() * abilityRank(AbilityType.RAGE);
 	}
 
 	// --- Abklingzeiten ---
