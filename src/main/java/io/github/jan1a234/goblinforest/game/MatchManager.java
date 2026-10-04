@@ -149,7 +149,12 @@ public final class MatchManager {
 			return;
 		}
 		if (match.finished()) {
+			Match ended = match;
 			match = null;
+			if (ended.continuesSeries()) {
+				match = new Match(s, ended.arena(), ended.assignment(), ended.names(), ended.options());
+				GoblinForest.LOGGER.info("Goblin Forest: Runde {} der Serie beginnt", ended.options().series().round());
+			}
 		}
 	}
 
@@ -216,6 +221,16 @@ public final class MatchManager {
 	 * (Übungsmodus zum Ausprobieren alleine, ohne Aufgabe-Regel).
 	 */
 	public static Result start(MinecraftServer s, ServerPlayer starter, boolean practice) {
+		return start(s, starter, practice, null, 1);
+	}
+
+	/**
+	 * Startet ein Match mit allen angemeldeten Spielern.
+	 *
+	 * @param ai     Schwierigkeit eines KI-Gegners oder null; mit KI spielen alle Angemeldeten in einem Clan
+	 * @param bestOf Anzahl der Runden einer Serie (1, 3 oder 5)
+	 */
+	public static Result start(MinecraftServer s, ServerPlayer starter, boolean practice, AiDifficulty ai, int bestOf) {
 		if (match != null) {
 			return Result.fail("command.goblinforest.match_running");
 		}
@@ -248,6 +263,17 @@ public final class MatchManager {
 				}
 			}
 		}
+		if (ai != null) {
+			// Gegen die KI spielen alle Angemeldeten zusammen im Clan des ersten Spielers mit Wunsch (sonst Rot).
+			TeamColor humans = assignment.isEmpty() ? TeamColor.RED : assignment.values().iterator().next();
+			assignment.replaceAll((uuid, team) -> humans);
+			for (UUID uuid : flexible) {
+				assignment.put(uuid, humans);
+			}
+			flexible.clear();
+			red = humans == TeamColor.RED ? assignment.size() : 0;
+			green = humans == TeamColor.GREEN ? assignment.size() : 0;
+		}
 		for (UUID uuid : flexible) {
 			TeamColor team = red <= green ? TeamColor.RED : TeamColor.GREEN;
 			assignment.put(uuid, team);
@@ -260,17 +286,27 @@ public final class MatchManager {
 		if (assignment.isEmpty()) {
 			return Result.fail("command.goblinforest.nobody");
 		}
-		if (!practice && (red == 0 || green == 0)) {
+		if (!practice && ai == null && (red == 0 || green == 0)) {
 			return Result.fail("command.goblinforest.need_both_teams");
 		}
 		LOBBY.clear();
-		match = new Match(s, arena, assignment, names, practice || red == 0 || green == 0);
+		Series series = bestOf > 1 ? new Series(bestOf) : null;
+		match = new Match(s, arena, assignment, names, new MatchOptions(practice || ai == null && (red == 0 || green == 0), ai, series));
 		for (Map.Entry<UUID, TeamColor> entry : assignment.entrySet()) {
 			ServerPlayer player = s.getPlayerList().getPlayer(entry.getKey());
 			if (player != null) {
 				player.sendSystemMessage(Component.translatable("command.goblinforest.started",
 						Component.translatable(entry.getValue().translationKey()).withColor(entry.getValue().rgb())).withStyle(ChatFormatting.GOLD));
 			}
+		}
+		if (ai != null) {
+			TeamColor aiTeam = match.aiTeam();
+			return Result.ok(Component.translatable("command.goblinforest.starting_ai", assignment.size(),
+					Component.translatable(aiTeam.translationKey()).withColor(aiTeam.rgb()), Component.translatable(ai.translationKey()),
+					bestOf));
+		}
+		if (bestOf > 1) {
+			return Result.ok(Component.translatable("command.goblinforest.starting_series", assignment.size(), bestOf));
 		}
 		return Result.ok(Component.translatable("command.goblinforest.starting", assignment.size()));
 	}
@@ -281,11 +317,16 @@ public final class MatchManager {
 	 * Dimensionen aus Datenpaketen, deshalb kann der Test eine andere Welt als Arena vorgeben.
 	 */
 	public static Match startWithoutPlayers(MinecraftServer s, ServerLevel arena) {
+		return startWithoutPlayers(s, arena, MatchOptions.single(true));
+	}
+
+	/** Wie {@link #startWithoutPlayers(MinecraftServer, ServerLevel)}, mit KI-Clan und/oder Best-of-Serie. */
+	public static Match startWithoutPlayers(MinecraftServer s, ServerLevel arena, MatchOptions options) {
 		if (match != null) {
 			match.finish(null);
 		}
 		server = s;
-		match = new Match(s, arena, Map.of(), Map.of(), true);
+		match = new Match(s, arena, Map.of(), Map.of(), options);
 		return match;
 	}
 

@@ -41,6 +41,8 @@ public final class TeamState {
 
 	private final Statistics stats = new Statistics();
 
+	private double incomeMultiplier = 1.0;
+
 	public TeamState(TeamColor color, Balance balance) {
 		this.color = color;
 		this.balance = balance;
@@ -83,10 +85,15 @@ public final class TeamState {
 		stats.goldSpent += cost;
 	}
 
-	/** Passives Einkommen pro Sekunde: Grundeinkommen plus Goldmine. */
+	/** Passives Einkommen pro Sekunde: Grundeinkommen (beim KI-Clan je nach Schwierigkeit angepasst) plus Goldmine. */
 	public double incomePerSecond() {
 		Balance.UpgradeTrack mine = balance.upgrade(UpgradeType.GOLDMINE.id());
-		return balance.economy().passiveGoldPerSecond() + mine.valuePerLevel() * strongholdUpgrade(UpgradeType.GOLDMINE);
+		return balance.economy().passiveGoldPerSecond() * incomeMultiplier + mine.valuePerLevel() * strongholdUpgrade(UpgradeType.GOLDMINE);
+	}
+
+	/** Faktor auf das Grundeinkommen (für den KI-Clan). */
+	public void setIncomeMultiplier(double multiplier) {
+		incomeMultiplier = multiplier;
 	}
 
 	/** Passives Einkommen für einen Tick. Zählt als verdientes Gold für die Statistik. */
