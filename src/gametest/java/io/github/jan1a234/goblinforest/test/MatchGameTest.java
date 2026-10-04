@@ -52,6 +52,9 @@ public class MatchGameTest {
 					int kills = red.stats().unitKills + green.stats().unitKills;
 					int bestLevel = Math.max(red.stats().highestUnitLevel, green.stats().highestUnitLevel);
 					if (kills >= 3 && bestLevel >= 2) {
+						io.github.jan1a234.goblinforest.GoblinForest.LOGGER.info(
+								"[Selbsttest] Tick {}: {} Kills, beste Stufe {}, Gold rot {} / grün {}, Goblins {}",
+								helper.getTick(), kills, bestLevel, red.gold(), green.gold(), match.unitCount());
 						destroyGreen(helper, match);
 						stage[0] = 2;
 					}

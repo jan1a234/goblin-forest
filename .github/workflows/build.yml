@@ -47,6 +47,9 @@ jobs:
           chmod +x ./gradlew
           set -o pipefail
           ./gradlew build -Pmod_version="${{ steps.version.outputs.version }}" 2>&1 | tee build.log
+      - name: Ergebnis des Match-Tests
+        if: always()
+        run: grep -E "Selbsttest|required tests|tests? (passed|failed)|goblinforest-test:" build.log | tail -20 || true
       - name: Fehler zusammenfassen
         if: failure()
         run: |
