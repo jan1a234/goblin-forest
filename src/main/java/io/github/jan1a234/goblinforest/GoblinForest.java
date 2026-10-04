@@ -6,6 +6,7 @@ import io.github.jan1a234.goblinforest.config.BalanceLoader;
 import io.github.jan1a234.goblinforest.game.MatchManager;
 import io.github.jan1a234.goblinforest.net.ModNetworking;
 import io.github.jan1a234.goblinforest.registry.ModEntities;
+import io.github.jan1a234.goblinforest.registry.ModSounds;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
@@ -29,6 +30,7 @@ public class GoblinForest implements ModInitializer {
 	public void onInitialize() {
 		balance = BalanceLoader.loadDefaults();
 		ModEntities.register();
+		ModSounds.register();
 		ModNetworking.registerPayloads();
 		MatchManager.init();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> GfCommand.register(dispatcher));

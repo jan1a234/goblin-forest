@@ -287,5 +287,8 @@
 	"title.goblinforest.round_lost": "Round lost",
 	"title.goblinforest.series_won": "Series won!",
 	"title.goblinforest.series_lost": "Series lost",
-	"title.goblinforest.series_score": "Score %s : %s"
+	"title.goblinforest.series_score": "Score %s : %s",
+	"subtitles.goblinforest.war_drums": "War drums beat",
+	"subtitles.goblinforest.coins": "Coins jingle",
+	"subtitles.goblinforest.war_horn": "War horn sounds"
 }

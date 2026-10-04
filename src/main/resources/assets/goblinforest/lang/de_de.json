@@ -287,5 +287,8 @@
 	"title.goblinforest.round_lost": "Runde verloren",
 	"title.goblinforest.series_won": "Serie gewonnen!",
 	"title.goblinforest.series_lost": "Serie verloren",
-	"title.goblinforest.series_score": "Stand %s : %s"
+	"title.goblinforest.series_score": "Stand %s : %s",
+	"subtitles.goblinforest.war_drums": "Kriegstrommeln",
+	"subtitles.goblinforest.coins": "Münzen klimpern",
+	"subtitles.goblinforest.war_horn": "Kriegshorn ertönt"
 }

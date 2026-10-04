@@ -1,5 +1,6 @@
 package io.github.jan1a234.goblinforest.test;
 
+import io.github.jan1a234.goblinforest.GoblinForest;
 import io.github.jan1a234.goblinforest.arena.ArenaLayout;
 import io.github.jan1a234.goblinforest.game.AiDifficulty;
 import io.github.jan1a234.goblinforest.game.Match;
@@ -17,6 +18,7 @@ import io.github.jan1a234.goblinforest.upgrade.UpgradeKey;
 import io.github.jan1a234.goblinforest.upgrade.UpgradeType;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
@@ -29,6 +31,17 @@ import net.minecraft.world.phys.Vec3;
  */
 public class MatchGameTest {
 	private static final int SETUP_LIMIT = 20 * 30;
+
+	/** Die eigenen Klänge sind registriert und liegen samt sounds.json in der Jar. */
+	@GameTest
+	public void soundsRegistered(GameTestHelper helper) {
+		for (String name : new String[] {"war_drums", "coins", "war_horn"}) {
+			helper.assertTrue(BuiltInRegistries.SOUND_EVENT.containsKey(GoblinForest.id(name)), "Klang nicht registriert: " + name);
+			helper.assertTrue(MatchGameTest.class.getResource("/assets/goblinforest/sounds/" + name + ".ogg") != null, "Klangdatei fehlt: " + name);
+		}
+		helper.assertTrue(MatchGameTest.class.getResource("/assets/goblinforest/sounds.json") != null, "sounds.json fehlt");
+		helper.succeed();
+	}
 
 	/** Ein Test für alles, weil es nur eine Arena gibt (Gametests einer Gruppe laufen parallel). */
 	@GameTest(maxTicks = 20 * 300)

@@ -5,7 +5,9 @@ import io.github.jan1a234.goblinforest.unit.GoblinUnit;
 import io.github.jan1a234.goblinforest.unit.UnitType;
 import java.util.HashMap;
 import java.util.Map;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.model.animal.wolf.AdultWolfModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.model.monster.piglin.AdultPiglinModel;
 import net.minecraft.client.model.monster.piglin.BabyPiglinModel;
@@ -29,7 +31,8 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * Zeichnet Goblins mit dem Piglin-Modell (Ohren, Hauer, gedrungener Körper) und eigenen Texturen
  * je Einheitentyp und Clan. Rüstung ab Veteran wird über die normale Rüstungsschicht gezeigt,
- * der Katapult-Goblin schiebt zusätzlich seinen Werfer-Karren ({@link GoblinCartLayer}).
+ * der Katapult-Goblin schiebt zusätzlich seinen Werfer-Karren ({@link GoblinCartLayer}), der Wolfsreiter
+ * sitzt auf einem Warg ({@link GoblinMountLayer}).
  */
 public class GoblinRenderer extends HumanoidMobRenderer<GoblinUnit, PiglinRenderState, PiglinModel> {
 	private static final Map<String, Identifier> TEXTURES = new HashMap<>();
@@ -45,6 +48,7 @@ public class GoblinRenderer extends HumanoidMobRenderer<GoblinUnit, PiglinRender
 				ArmorModelSet.bake(ModelLayers.PIGLIN_BABY_ARMOR, context.getModelSet(), BabyPiglinModel::new),
 				context.getEquipmentRenderer()));
 		addLayer(new GoblinCartLayer(this));
+		addLayer(new GoblinMountLayer(this, new AdultWolfModel(context.bakeLayer(ModelLayers.WOLF))));
 		blockModelResolver = context.getBlockModelResolver();
 	}
 
@@ -60,6 +64,11 @@ public class GoblinRenderer extends HumanoidMobRenderer<GoblinUnit, PiglinRender
 		if (state instanceof GoblinRenderState goblin) {
 			goblin.unit = type.id();
 			goblin.team = entity.team().id();
+			goblin.mounted = type == UnitType.WOLF_RIDER;
+			goblin.aggressive = entity.isAggressive();
+			if (goblin.mounted) {
+				state.isPassenger = true;
+			}
 			if (type == UnitType.CATAPULT) {
 				blockModelResolver.update(goblin.cart, CART, EndermanRenderer.BLOCK_DISPLAY_CONTEXT);
 			} else {
@@ -68,6 +77,15 @@ public class GoblinRenderer extends HumanoidMobRenderer<GoblinUnit, PiglinRender
 		}
 		boolean melee = type != UnitType.ARCHER && type != UnitType.SHAMAN && type != UnitType.CATAPULT;
 		state.armPose = melee && entity.isAggressive() ? PiglinArmPose.ATTACKING_WITH_MELEE_WEAPON : PiglinArmPose.DEFAULT;
+	}
+
+	@Override
+	protected void scale(PiglinRenderState state, PoseStack poseStack) {
+		super.scale(state, poseStack);
+		if (state instanceof GoblinRenderState goblin && goblin.mounted) {
+			// Modellraum: Y zeigt nach unten, also ist negativ „nach oben“.
+			poseStack.translate(0.0F, -GoblinMountLayer.RIDER_RAISE, 0.0F);
+		}
 	}
 
 	@Override

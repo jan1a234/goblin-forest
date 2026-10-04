@@ -45,6 +45,7 @@ public class GoblinForestClient implements ClientModInitializer {
 		ClientPlayNetworking.registerGlobalReceiver(OpenMenuPayload.TYPE, (payload, context) -> openMenu(context.client()));
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
 			ClientMatchState.reset();
+			WarDrums.reset(client);
 			restoreCamera(client);
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(GoblinForestClient::tick);
@@ -68,6 +69,7 @@ public class GoblinForestClient implements ClientModInitializer {
 
 	private static void tick(Minecraft client) {
 		ClientMatchState.tick();
+		WarDrums.tick(client);
 		boolean active = ClientMatchState.active() && client.player != null;
 		if (!active) {
 			restoreCamera(client);

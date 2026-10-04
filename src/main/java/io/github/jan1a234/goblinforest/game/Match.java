@@ -10,6 +10,7 @@ import io.github.jan1a234.goblinforest.hero.HeroProgression;
 import io.github.jan1a234.goblinforest.net.MatchStatePayload;
 import io.github.jan1a234.goblinforest.registry.ModEntities;
 import io.github.jan1a234.goblinforest.spell.SpellType;
+import io.github.jan1a234.goblinforest.registry.ModSounds;
 import io.github.jan1a234.goblinforest.unit.GoblinUnit;
 import io.github.jan1a234.goblinforest.unit.Knockback;
 import io.github.jan1a234.goblinforest.unit.UnitCombat;
@@ -32,9 +33,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.resources.Identifier;
@@ -388,7 +391,7 @@ public final class Match {
 				setFrozen(player, false);
 				title(player, Component.translatable("title.goblinforest.fight").withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
 						Component.translatable("title.goblinforest.fight_sub"), 0, 30, 15);
-				playTo(player, SoundEvents.RAID_HORN.value(), 1.0f, 1.0f);
+				playTo(player, ModSounds.WAR_HORN, 1.0f, 1.0f);
 			}
 			return;
 		}
@@ -809,6 +812,12 @@ public final class Match {
 				Component.literal(hero.name).withColor(hero.team.rgb()),
 				bounty.heroKillBounty(),
 				Component.translatable(enemy.translationKey()).withColor(enemy.rgb())));
+		for (ServerPlayer other : onlineHeroes()) {
+			Hero otherHero = heroes.get(other.getUUID());
+			if (otherHero != null && otherHero.team == enemy) {
+				playTo(other, ModSounds.COINS, 0.9f, 0.8f);
+			}
+		}
 		return false;
 	}
 
@@ -937,6 +946,7 @@ public final class Match {
 			}
 			if (killer instanceof ServerPlayer player) {
 				player.sendOverlayMessage(Component.translatable("message.goblinforest.bounty", gold).withStyle(ChatFormatting.GOLD));
+				playTo(player, ModSounds.COINS, 0.5f, 0.9f + 0.2f * arena.getRandom().nextFloat());
 			}
 			arena.sendParticles(new DustParticleOptions(0xF2C744, 1.0f), unit.getX(), unit.getY() + 1.2, unit.getZ(), 6, 0.2, 0.3, 0.2, 0);
 		}
@@ -1502,7 +1512,7 @@ public final class Match {
 		}
 		rallyPoints.put(hero.team, point);
 		setStance(hero.team, Stance.HOLD);
-		arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RAID_HORN.value(), SoundSource.PLAYERS, 0.5f, 1.4f);
+		arena.playSound(null, player.getX(), player.getY(), player.getZ(), ModSounds.WAR_HORN, SoundSource.PLAYERS, 0.7f, 1.25f);
 	}
 
 	private void drawRallyMarkers() {
@@ -2079,8 +2089,10 @@ public final class Match {
 		player.connection.send(new ClientboundSetTitleTextPacket(title));
 	}
 
+	/** Spielt einen Klang nur für diesen Spieler (der Gegner hört Countdown, Kopfgeld usw. nicht mit). */
 	private void playTo(ServerPlayer player, SoundEvent sound, float volume, float pitch) {
-		player.level().playSound(null, player.getX(), player.getY(), player.getZ(), sound, SoundSource.MASTER, volume, pitch);
+		player.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound), SoundSource.MASTER,
+				player.getX(), player.getY(), player.getZ(), volume, pitch, player.getRandom().nextLong()));
 	}
 
 	private void syncAll() {

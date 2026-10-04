@@ -9,4 +9,7 @@ public class GoblinRenderState extends PiglinRenderState {
 	public String team = "red";
 	/** Belagerungskarren des Katapults (leer bei allen anderen Einheiten). */
 	public final BlockModelRenderState cart = new BlockModelRenderState();
+	/** Wolfsreiter: sitzt auf einem Warg ({@link GoblinMountLayer}). */
+	public boolean mounted;
+	public boolean aggressive;
 }
