@@ -81,8 +81,10 @@ Die neuesten Bildschirmfotos liegen im Branch [`ci-screenshots`](https://github.
 GitHub Actions baut bei jedem Push und Pull Request automatisch (`.github/workflows/build.yml`).
 
 - Jeder Push auf `main` ersetzt das Vorab-Release **dev** durch die neue Jar.
-- Ein Git-Tag `v<Version>` erstellt ein richtiges Release, zum Beispiel:
-  `git tag v1.1.0 && git push origin v1.1.0`, oder auf GitHub unter *Releases → Draft a new release* einen neuen Tag wie `v1.1.0` anlegen.
+- Ein richtiges Release entsteht am einfachsten auf GitHub unter *Actions → build → Run workflow*: dort die Versionsnummer
+  eintragen (z. B. `1.1.0`), dann werden Tag `v1.1.0` und Release mit der Jar angelegt. Liegt eine Datei
+  `docs/release-notes/v1.1.0.md` bei, wird sie als Beschreibung verwendet.
+- Alternativ geht auch ein Git-Tag: `git tag v1.1.0 && git push origin v1.1.0`.
 
 ## Aufbau des Codes
 

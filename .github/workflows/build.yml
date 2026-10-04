@@ -1,6 +1,7 @@
 # Baut die Mod bei jedem Push und Pull Request.
 # - Push auf main: aktualisiert das Vorab-Release "dev" mit der neuesten .jar.
-# - Git-Tag v* (z. B. v0.1.0): erstellt ein richtiges Release mit der .jar als Download.
+# - Git-Tag v* (z. B. v1.0.0): erstellt ein richtiges Release mit der .jar als Download.
+# - Von Hand unter Actions → build → "Run workflow" mit einer Versionsnummer: legt Tag und Release in einem Schritt an.
 
 name: build
 on:
@@ -8,6 +9,12 @@ on:
     branches: ['**', '!ci-screenshots']
     tags: ['v*']
   pull_request:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Versionsnummer für ein Release, z. B. 1.0.0 (leer lassen = nur bauen)'
+        required: false
+        default: ''
 
 concurrency:
   group: build-${{ github.ref }}
@@ -32,10 +39,14 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
       - name: Version bestimmen
         id: version
+        env:
+          RELEASE_INPUT: ${{ github.event.inputs.release }}
         run: |
           base=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             version="${GITHUB_REF_NAME#v}"
+          elif [[ -n "$RELEASE_INPUT" ]]; then
+            version="${RELEASE_INPUT#v}"
           else
             version="${base}+build.${GITHUB_RUN_NUMBER}"
           fi
@@ -115,11 +126,16 @@ jobs:
             --notes "Automatisch gebaut aus dem neuesten Stand von main (Commit $GITHUB_SHA). Noch nicht fertig, nur zum Testen. Benötigt Minecraft 26.2, Fabric Loader 0.19.5+ und Fabric API."
 
       - name: Release erstellen
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release != '')
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           jar=$(ls build/libs/goblinforest-*.jar | grep -v -- '-sources.jar')
-          gh release create "$GITHUB_REF_NAME" "$jar" \
-            --title "Goblin Forest $GITHUB_REF_NAME" \
-            --generate-notes
+          notes=""
+          [ -f "docs/release-notes/v$VERSION.md" ] && notes="docs/release-notes/v$VERSION.md"
+          if [ -n "$notes" ]; then
+            gh release create "v$VERSION" "$jar" --target "$GITHUB_SHA" --title "Goblin Forest v$VERSION" --notes-file "$notes"
+          else
+            gh release create "v$VERSION" "$jar" --target "$GITHUB_SHA" --title "Goblin Forest v$VERSION" --generate-notes
+          fi
