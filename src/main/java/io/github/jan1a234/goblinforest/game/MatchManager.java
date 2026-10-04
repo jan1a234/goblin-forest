@@ -272,15 +272,12 @@ public final class MatchManager {
 
 	/**
 	 * Startet ein Übungsmatch ganz ohne Spieler (nur für automatische Tests): Einheiten werden per
-	 * {@link Match#recruitForTest} gekauft und kämpfen alleine.
+	 * {@link Match#recruitForTest} gekauft und kämpfen alleine. Der Gametest-Server von Minecraft lädt keine
+	 * Dimensionen aus Datenpaketen, deshalb kann der Test eine andere Welt als Arena vorgeben.
 	 */
-	public static Match startWithoutPlayers(MinecraftServer s) {
+	public static Match startWithoutPlayers(MinecraftServer s, ServerLevel arena) {
 		if (match != null) {
 			match.finish(null);
-		}
-		ServerLevel arena = s.getLevel(ARENA);
-		if (arena == null) {
-			throw new IllegalStateException("Arena-Dimension " + ARENA + " fehlt");
 		}
 		server = s;
 		match = new Match(s, arena, Map.of(), Map.of(), true);
