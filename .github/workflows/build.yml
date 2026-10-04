@@ -51,7 +51,7 @@ jobs:
         if: failure()
         run: |
           echo "===== FEHLER-ZUSAMMENFASSUNG ====="
-          grep -n -E "error:|Exception|Caused by|Description:|GameTest|gametest|FAILED|failed|ERROR|WARN.*goblinforest|\[goblinforest" build.log | grep -v "fabric-gametest-api-v1:" | head -150
+          grep -n -E "error:|Exception|Caused by|Description:|GameTest|gametest|FAILED|failed|ERROR|WARN.*goblinforest|[Dd]imension|arena|\[goblinforest" build.log | grep -v "fabric-gametest-api-v1:" | head -150
           echo "===== ENDE ====="
       - name: Build-Ergebnis hochladen
         uses: actions/upload-artifact@v7

@@ -25,9 +25,11 @@ public class MatchGameTest {
 	/** Ein Test für alles, weil es nur eine Arena gibt (Gametests einer Gruppe laufen parallel). */
 	@GameTest(maxTicks = 20 * 240)
 	public void fullMatchWithoutPlayers(GameTestHelper helper) {
+		java.util.List<String> levels = new java.util.ArrayList<>();
+		helper.getLevel().getServer().getAllLevels().forEach(level -> levels.add(level.dimension().toString()));
+		helper.assertTrue(helper.getLevel().getServer().getLevel(MatchManager.ARENA) != null, "Arena-Dimension fehlt, vorhanden: " + levels);
 		Match match = MatchManager.startWithoutPlayers(helper.getLevel().getServer());
 		ServerLevel arena = match.arena();
-		helper.assertTrue(arena != null, "Arena-Dimension fehlt");
 		int[] stage = {0};
 		helper.onEachTick(() -> {
 			switch (stage[0]) {

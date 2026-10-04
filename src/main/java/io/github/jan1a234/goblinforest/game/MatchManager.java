@@ -278,8 +278,12 @@ public final class MatchManager {
 		if (match != null) {
 			match.finish(null);
 		}
+		ServerLevel arena = s.getLevel(ARENA);
+		if (arena == null) {
+			throw new IllegalStateException("Arena-Dimension " + ARENA + " fehlt");
+		}
 		server = s;
-		match = new Match(s, s.getLevel(ARENA), Map.of(), Map.of(), true);
+		match = new Match(s, arena, Map.of(), Map.of(), true);
 		return match;
 	}
 
