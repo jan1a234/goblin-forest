@@ -31,7 +31,7 @@ public final class HeroKit {
 		FIREBALL("fireball", 1, Items.FIRE_CHARGE, "cast:fireball"),
 		HEALING("healing", 2, Items.RED_MUSHROOM, "cast:healing"),
 		ROOTS("roots", 3, Items.HANGING_ROOTS, "cast:roots"),
-		LIGHTNING("lightning", 4, Items.LIGHTNING_ROD, "cast:lightning"),
+		LIGHTNING("lightning", 4, Items.BREEZE_ROD, "cast:lightning"),
 		METEOR("meteor", 5, Items.MAGMA_BLOCK, "cast:meteor"),
 		BLOODLUST("bloodlust", 6, Items.BLAZE_POWDER, "ability:bloodlust"),
 		BATTLE_SLAM("battleSlam", 7, Items.HEAVY_CORE, "ability:battleSlam"),

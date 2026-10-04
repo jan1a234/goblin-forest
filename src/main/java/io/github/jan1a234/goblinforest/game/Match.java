@@ -1643,7 +1643,7 @@ public final class Match {
 			arena.addFreshEntity(bolt);
 		}
 		arena.sendParticles(ParticleTypes.ELECTRIC_SPARK, at.x, at.y + 1, at.z, 30, 0.4, 1.0, 0.4, 0.3);
-		arena.sendParticles(ParticleTypes.FLASH, at.x, at.y + 1, at.z, 1, 0, 0, 0, 0);
+		arena.sendParticles(ParticleTypes.END_ROD, at.x, at.y + 1.5, at.z, 12, 0.2, 1.2, 0.2, 0.05);
 	}
 
 	/**
