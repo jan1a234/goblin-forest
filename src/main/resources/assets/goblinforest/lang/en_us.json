@@ -145,7 +145,7 @@
 	"menu.goblinforest.unit.warrior.desc": "Tough, blocks frontal hits with a shield",
 	"menu.goblinforest.unit.archer.desc": "Shoots from a safe distance",
 	"menu.goblinforest.unit.assassin.desc": "Stealthed, double first strike, hunts chieftains",
-	"menu.goblinforest.recruit": "Recruit %sg%s",
+	"menu.goblinforest.recruit": "+ %sg%s",
 	"menu.goblinforest.stance": "Stance:",
 	"menu.goblinforest.stance.advance.desc": "The army marches down the lane to the enemy fortress.",
 	"menu.goblinforest.stance.hold.desc": "The army stops and defends (or at the war horn's rally point).",
@@ -287,5 +287,10 @@
 	"title.goblinforest.round_lost": "Round lost",
 	"title.goblinforest.series_won": "Series won!",
 	"title.goblinforest.series_lost": "Series lost",
-	"title.goblinforest.series_score": "Score %s : %s"
+	"title.goblinforest.series_score": "Score %s : %s",
+	"subtitles.goblinforest.war_drums": "War drums beat",
+	"subtitles.goblinforest.coins": "Coins jingle",
+	"subtitles.goblinforest.war_horn": "War horn sounds",
+	"key.goblinforest.command_view": "Command view",
+	"hud.goblinforest.command_view": "Command view · %s: back"
 }

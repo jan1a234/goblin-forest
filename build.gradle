@@ -25,12 +25,12 @@ loom {
 }
 
 fabricApi {
-	// Server-Gametests (src/gametest): ein echtes Match ohne Spieler, siehe MatchGameTest.
+	// Gametests (src/gametest): ein echtes Match ohne Spieler (MatchGameTest) und ein Client-Test mit Bildschirmfotos (ClientMatchGameTest).
 	configureTests {
 		createSourceSet = true
 		modId = "goblinforest-test"
 		enableGameTests = true
-		enableClientGameTests = false
+		enableClientGameTests = true
 		eula = false
 	}
 }

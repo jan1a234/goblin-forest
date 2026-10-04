@@ -6,7 +6,7 @@ Das Spieldesign steht in [docs/DESIGN.md](docs/DESIGN.md).
 ## Installieren
 
 1. Die neueste `goblinforest-….jar` unter [Releases](https://github.com/jan1a234/goblin-forest/releases) herunterladen.
-   Das Release **dev** ist immer der neueste Stand von `main`, Releases mit `v` davor (z. B. `v0.1.0`) sind fertige Versionen.
+   Das Release **dev** ist immer der neueste Stand von `main`, Releases mit `v` davor (z. B. `v1.0.0`) sind fertige Versionen.
 2. Die Jar zusammen mit der passenden [Fabric API](https://modrinth.com/mod/fabric-api) (für 26.2) in den `mods`-Ordner legen,
    und zwar **auf dem Server und bei beiden Spielern**.
 3. Voraussetzungen: Minecraft Java 26.2, Fabric Loader 0.19.5 oder neuer, Java 25.
@@ -46,6 +46,7 @@ Die Kamera steht im Match fest in der Verfolgerperspektive, ihr Abstand lässt s
 | **J** / **K** | Feuerball / Heilende Pilze (kosten Gold) |
 | Hotbar 2–9 + Rechtsklick | Alle Zauber (auch Wurzelfessel, Blitzsturm, Meteor) und Fähigkeiten |
 | **Bild↑** / **Bild↓** | Kamera näher / weiter weg |
+| **Linke Alt-Taste** | Kommandoansicht: Kamera über dem Schlachtfeld, mit den Bewegungstasten schwenken; Zauber und Sammelpunkt zielen auf die Bildmitte |
 | Linksklick | Angreifen; auf Turm oder Festung des Gegners gehalten: Gebäude beschädigen |
 
 Gold kommt passiv und als Kopfgeld für getötete Goblins (mehr, je weiter vorne der Kill passiert). Kills bringen Clan-Erfahrung,
@@ -55,6 +56,9 @@ Mehrfachschuss der Bogenschützen). Der Häuptling selbst erreicht Stufe 10 und 
 
 Die Festung lässt sich ausbauen: Turm, Mauern, Hütten (mehr Armee), eine **Kanone** auf der Mauer und eine **Goldmine** im Hof.
 Dauert ein Match länger als 25 Minuten, beginnt der **Sudden Death**: beide Festungskerne verlieren dann langsam Leben.
+
+Während der Schlacht spielen eigene Kriegstrommeln (Lautstärke über den Musik-Regler). Für die Kommandoansicht lohnt sich eine
+Sichtweite von mindestens 10 Chunks, damit die ganze Arena zu sehen ist.
 
 Für Server-Betreiber: Die Mod legt die Dimension `goblinforest:arena` per Datenpaket an. Sie erscheint automatisch,
 auch in bestehenden Welten, sobald die Mod installiert ist.
@@ -67,13 +71,18 @@ auch in bestehenden Welten, sobald die Mod installiert ist.
 
 Die Jar liegt danach in `build/libs/`. Benötigt Java 25.
 
+Getestet wird bei jedem Build auf zwei Arten: `MatchGameTest` spielt auf einem echten Server ein komplettes Match ohne Spieler
+durch (alle Einheiten, Zauber, Ausbauten, KI, Best-of-Serie), und `ClientMatchGameTest` startet einen echten Minecraft-Client,
+spielt ein Match gegen die KI an und macht Bildschirmfotos von HUD, Armee, Kriegsmenü und Kommandoansicht.
+Die neuesten Bildschirmfotos liegen im Branch [`ci-screenshots`](https://github.com/jan1a234/goblin-forest/tree/ci-screenshots).
+
 ## Release erstellen
 
 GitHub Actions baut bei jedem Push und Pull Request automatisch (`.github/workflows/build.yml`).
 
 - Jeder Push auf `main` ersetzt das Vorab-Release **dev** durch die neue Jar.
 - Ein Git-Tag `v<Version>` erstellt ein richtiges Release, zum Beispiel:
-  `git tag v0.1.0 && git push origin v0.1.0`, oder auf GitHub unter *Releases → Draft a new release* einen neuen Tag `v0.1.0` anlegen.
+  `git tag v1.1.0 && git push origin v1.1.0`, oder auf GitHub unter *Releases → Draft a new release* einen neuen Tag wie `v1.1.0` anlegen.
 
 ## Aufbau des Codes
 

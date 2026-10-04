@@ -45,7 +45,8 @@ public record MatchStatePayload(
 		int suddenDeathSeconds,
 		float income,
 		int[] roundWins,
-		int bestOf
+		int bestOf,
+		boolean commandView
 ) implements CustomPacketPayload {
 	public static final Type<MatchStatePayload> TYPE = new Type<>(GoblinForest.id("match_state"));
 	public static final StreamCodec<FriendlyByteBuf, MatchStatePayload> CODEC = CustomPacketPayload.codec(MatchStatePayload::write, MatchStatePayload::read);
@@ -54,7 +55,7 @@ public record MatchStatePayload(
 	public static MatchStatePayload none() {
 		return new MatchStatePayload(0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
 				new float[2], new float[2], new float[2], new float[2], new int[8], 0, 1, 0, false, List.of(), List.of(),
-				0, 0, 0, -1, 0, new int[2], 1);
+				0, 0, 0, -1, 0, new int[2], 1, false);
 	}
 
 	/** Läuft gerade der Sudden Death (Festungskerne verlieren Leben)? */
@@ -126,6 +127,7 @@ public record MatchStatePayload(
 		buf.writeVarInt(roundWins[0]);
 		buf.writeVarInt(roundWins[1]);
 		buf.writeVarInt(bestOf);
+		buf.writeBoolean(commandView);
 	}
 
 	private static MatchStatePayload read(FriendlyByteBuf buf) {
@@ -172,10 +174,11 @@ public record MatchStatePayload(
 		float income = buf.readFloat();
 		int[] roundWins = {buf.readVarInt(), buf.readVarInt()};
 		int bestOf = buf.readVarInt();
+		boolean commandView = buf.readBoolean();
 		return new MatchStatePayload(phase, team, phaseSeconds, matchSeconds, gold, reputation, reputationProgress, population,
 				populationLimit, stance, heroLevel, heroProgress, respawnSeconds, arrays[0], arrays[1], arrays[2], arrays[3],
 				unitCounts, enemyUnits, enemyHeroLevel, enemyReputation, rallySet, shop, cooldowns,
-				abilityPoints, rageCharge, rageSeconds, suddenDeathSeconds, income, roundWins, bestOf);
+				abilityPoints, rageCharge, rageSeconds, suddenDeathSeconds, income, roundWins, bestOf, commandView);
 	}
 
 	@Override

@@ -21,8 +21,10 @@ public final class ClientMatchState {
 	}
 
 	static void update(MatchStatePayload next) {
-		if (state.inMatch() && next.inMatch() && next.gold() > state.gold()) {
-			goldGain = next.gold() - state.gold() + (ticks - goldGainTime < 30 ? goldGain : 0);
+		// Nur echte Einnahmen (Kopfgeld, Rückerstattung) anzeigen, nicht das laufende Grundeinkommen.
+		int gain = next.gold() - state.gold();
+		if (state.inMatch() && next.inMatch() && gain > Math.ceil(next.income())) {
+			goldGain = gain + (ticks - goldGainTime < 30 ? goldGain : 0);
 			goldGainTime = ticks;
 		}
 		state = next;

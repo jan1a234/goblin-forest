@@ -1,0 +1,14 @@
+{
+	"war_drums": {
+		"subtitle": "subtitles.goblinforest.war_drums",
+		"sounds": [{"name": "goblinforest:war_drums", "stream": false}]
+	},
+	"coins": {
+		"subtitle": "subtitles.goblinforest.coins",
+		"sounds": ["goblinforest:coins"]
+	},
+	"war_horn": {
+		"subtitle": "subtitles.goblinforest.war_horn",
+		"sounds": ["goblinforest:war_horn"]
+	}
+}

@@ -10,6 +10,7 @@ import io.github.jan1a234.goblinforest.hero.HeroProgression;
 import io.github.jan1a234.goblinforest.net.MatchStatePayload;
 import io.github.jan1a234.goblinforest.registry.ModEntities;
 import io.github.jan1a234.goblinforest.spell.SpellType;
+import io.github.jan1a234.goblinforest.registry.ModSounds;
 import io.github.jan1a234.goblinforest.unit.GoblinUnit;
 import io.github.jan1a234.goblinforest.unit.Knockback;
 import io.github.jan1a234.goblinforest.unit.UnitCombat;
@@ -32,9 +33,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.resources.Identifier;
@@ -44,6 +47,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -102,6 +106,9 @@ public final class Match {
 		long rootedUntil = -1;
 		double cameraOffset = DEFAULT_CAMERA_OFFSET;
 		boolean raging;
+		/** Kommandoansicht: Kamera über dem Schlachtfeld, Häuptling steht still, gezielt wird auf {@link #commandFocus}. */
+		boolean commandView;
+		Vec3 commandFocus;
 
 		Hero(UUID uuid, String name, TeamColor team) {
 			this.uuid = uuid;
@@ -388,7 +395,7 @@ public final class Match {
 				setFrozen(player, false);
 				title(player, Component.translatable("title.goblinforest.fight").withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
 						Component.translatable("title.goblinforest.fight_sub"), 0, 30, 15);
-				playTo(player, SoundEvents.RAID_HORN.value(), 1.0f, 1.0f);
+				playTo(player, ModSounds.WAR_HORN, 1.0f, 1.0f);
 			}
 			return;
 		}
@@ -604,6 +611,8 @@ public final class Match {
 		updateXpBar(player, hero.team);
 		hero.prepared = true;
 		hero.dead = false;
+		hero.commandView = false;
+		hero.commandFocus = null;
 		setFrozen(player, phase == MatchPhase.COUNTDOWN || phase == MatchPhase.SETUP);
 		player.sendSystemMessage(Component.translatable("message.goblinforest.welcome",
 				Component.translatable(hero.team.translationKey()).withColor(hero.team.rgb())).withStyle(ChatFormatting.GOLD));
@@ -779,6 +788,7 @@ public final class Match {
 		if (phase != MatchPhase.BATTLE || hero.dead) {
 			return false;
 		}
+		leaveCommandView(player, hero);
 		TeamColor enemy = hero.team.opponent();
 		teams.get(hero.team).stats().heroDeaths++;
 		teams.get(enemy).stats().heroKills++;
@@ -809,6 +819,12 @@ public final class Match {
 				Component.literal(hero.name).withColor(hero.team.rgb()),
 				bounty.heroKillBounty(),
 				Component.translatable(enemy.translationKey()).withColor(enemy.rgb())));
+		for (ServerPlayer other : onlineHeroes()) {
+			Hero otherHero = heroes.get(other.getUUID());
+			if (otherHero != null && otherHero.team == enemy) {
+				playTo(other, ModSounds.COINS, 0.9f, 0.8f);
+			}
+		}
 		return false;
 	}
 
@@ -937,6 +953,7 @@ public final class Match {
 			}
 			if (killer instanceof ServerPlayer player) {
 				player.sendOverlayMessage(Component.translatable("message.goblinforest.bounty", gold).withStyle(ChatFormatting.GOLD));
+				playTo(player, ModSounds.COINS, 0.5f, 0.9f + 0.2f * arena.getRandom().nextFloat());
 			}
 			arena.sendParticles(new DustParticleOptions(0xF2C744, 1.0f), unit.getX(), unit.getY() + 1.2, unit.getZ(), 6, 0.2, 0.3, 0.2, 0);
 		}
@@ -1378,6 +1395,15 @@ public final class Match {
 				applyCamera(player, hero);
 			}
 			case "hit_structure" -> heroStructureHit(player, hero);
+			case "command_view" -> {
+				if ("on".equals(arg)) {
+					enterCommandView(player, hero);
+				} else {
+					leaveCommandView(player, hero);
+				}
+				ServerPlayNetworking.send(player, snapshot(hero));
+			}
+			case "command_focus" -> setCommandFocus(hero, arg);
 			case "menu" -> ServerPlayNetworking.send(player, io.github.jan1a234.goblinforest.net.OpenMenuPayload.INSTANCE);
 			default -> {
 			}
@@ -1502,7 +1528,7 @@ public final class Match {
 		}
 		rallyPoints.put(hero.team, point);
 		setStance(hero.team, Stance.HOLD);
-		arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RAID_HORN.value(), SoundSource.PLAYERS, 0.5f, 1.4f);
+		arena.playSound(null, player.getX(), player.getY(), player.getZ(), ModSounds.WAR_HORN, SoundSource.PLAYERS, 0.7f, 1.25f);
 	}
 
 	private void drawRallyMarkers() {
@@ -1547,7 +1573,64 @@ public final class Match {
 	}
 
 	/** Punkt, auf den der Spieler zielt: erster Block oder erstes Lebewesen auf der Blicklinie. */
+	private void enterCommandView(ServerPlayer player, Hero hero) {
+		if (phase != MatchPhase.BATTLE || hero.dead || hero.commandView) {
+			return;
+		}
+		hero.commandView = true;
+		hero.commandFocus = new Vec3(player.getX(), ArenaLayout.GROUND_Y + 1, player.getZ());
+		setFrozen(player, true);
+	}
+
+	private void leaveCommandView(ServerPlayer player, Hero hero) {
+		if (!hero.commandView) {
+			return;
+		}
+		hero.commandView = false;
+		hero.commandFocus = null;
+		if (phase == MatchPhase.BATTLE) {
+			setFrozen(player, false);
+		}
+	}
+
+	/** Der Client meldet, worauf die Kommandoansicht gerade blickt ("x:z"). */
+	private void setCommandFocus(Hero hero, String arg) {
+		if (!hero.commandView) {
+			return;
+		}
+		String[] xz = arg.split(":");
+		if (xz.length != 2) {
+			return;
+		}
+		try {
+			double x = Math.clamp(Double.parseDouble(xz[0]), -ArenaLayout.HALF_LENGTH + 1, ArenaLayout.HALF_LENGTH - 1);
+			double z = Math.clamp(Double.parseDouble(xz[1]), -ArenaLayout.HALF_WIDTH + 1, ArenaLayout.HALF_WIDTH - 1);
+			if (Double.isFinite(x) && Double.isFinite(z)) {
+				hero.commandFocus = new Vec3(x, ArenaLayout.GROUND_Y + 1, z);
+			}
+		} catch (NumberFormatException ignored) {
+			// ungültige Eingabe vom Client: Fokus bleibt
+		}
+	}
+
+	/** Oberfläche (erster freier Block über dem Boden) an einer Stelle der Arena. */
+	private Vec3 surfaceAt(double x, double z) {
+		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(Mth.floor(x), ArenaLayout.GROUND_Y + 24, Mth.floor(z));
+		while (pos.getY() > ArenaLayout.GROUND_Y && arena.getBlockState(pos).isAir()) {
+			pos.move(0, -1, 0);
+		}
+		return new Vec3(x, pos.getY() + 1, z);
+	}
+
+	/**
+	 * Zielpunkt für Zauber und Sammelpunkt: in der Kommandoansicht die Bildmitte, sonst der Punkt,
+	 * auf den der Häuptling schaut (erster Block oder erstes Wesen in Reichweite).
+	 */
 	private Vec3 aimPoint(ServerPlayer player, double range) {
+		Hero hero = heroes.get(player.getUUID());
+		if (hero != null && hero.commandView && hero.commandFocus != null) {
+			return surfaceAt(hero.commandFocus.x, hero.commandFocus.z);
+		}
 		Vec3 eye = player.getEyePosition();
 		Vec3 look = player.getLookAngle();
 		for (double d = 1.0; d <= range; d += 0.5) {
@@ -1966,6 +2049,7 @@ public final class Match {
 		for (ServerPlayer player : onlineHeroes()) {
 			Hero hero = heroes.get(player.getUUID());
 			boolean won = hero.team == winningTeam;
+			hero.commandView = false;
 			if (hero.dead) {
 				respawnHero(player, hero);
 			}
@@ -2079,8 +2163,10 @@ public final class Match {
 		player.connection.send(new ClientboundSetTitleTextPacket(title));
 	}
 
+	/** Spielt einen Klang nur für diesen Spieler (der Gegner hört Countdown, Kopfgeld usw. nicht mit). */
 	private void playTo(ServerPlayer player, SoundEvent sound, float volume, float pitch) {
-		player.level().playSound(null, player.getX(), player.getY(), player.getZ(), sound, SoundSource.MASTER, volume, pitch);
+		player.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound), SoundSource.MASTER,
+				player.getX(), player.getY(), player.getZ(), volume, pitch, player.getRandom().nextLong()));
 	}
 
 	private void syncAll() {
@@ -2160,7 +2246,7 @@ public final class Match {
 				shop, cooldowns,
 				state.abilityPoints(), (float) (state.rageCharge() / state.rageMax()), (int) ((state.rageRemaining(tick) + 19) / 20),
 				phase == MatchPhase.BATTLE ? (int) secondsUntilSuddenDeath() : -1, (float) state.incomePerSecond(),
-				new int[] {roundWins(TeamColor.RED), roundWins(TeamColor.GREEN)}, bestOf());
+				new int[] {roundWins(TeamColor.RED), roundWins(TeamColor.GREEN)}, bestOf(), hero.commandView);
 	}
 
 	/** Zeilen für {@code /gf status}. */

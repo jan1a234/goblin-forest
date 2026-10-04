@@ -53,6 +53,9 @@ public final class MatchHud {
 		drawResources(g, font, s);
 		drawCooldowns(g, font, s);
 		drawNotices(g, font, s);
+		if (CommandView.active()) {
+			drawCommandView(g, font);
+		}
 		if (s.respawnSeconds() > 0) {
 			Component text = Component.translatable("hud.goblinforest.respawn", s.respawnSeconds());
 			g.centeredText(font, text, g.guiWidth() / 2, g.guiHeight() / 2 + 20, 0xFFFF6B5B);
@@ -68,37 +71,47 @@ public final class MatchHud {
 		bar(g, x, y + 13, w, 6, s.phaseSeconds() / 100f, XP);
 	}
 
+	/** Höhe der Festungsleiste oben; alles andere beginnt darunter, damit sich bei kleiner GUI nichts überlappt. */
+	private static final int TOP_BAR_HEIGHT = 32;
+
 	private static void drawStructures(GuiGraphicsExtractor g, Font font, MatchStatePayload s) {
 		int cx = g.guiWidth() / 2;
-		int barWidth = 90;
+		int panelWidth = Math.min(g.guiWidth() - 8, 330);
+		int gap = 22;
+		int barWidth = (panelWidth - 12 - 2 * gap) / 2;
 		int y = 4;
-		panel(g, cx - barWidth - 30, y - 2, barWidth * 2 + 60, 30);
+		panel(g, cx - panelWidth / 2, y - 2, panelWidth, 28);
 		String time = String.format("%d:%02d", s.matchSeconds() / 60, s.matchSeconds() % 60);
 		g.centeredText(font, time, cx, y + 9, TEXT);
 		for (TeamColor team : TeamColor.values()) {
 			int i = team.ordinal();
 			boolean left = team == TeamColor.RED;
-			int x = left ? cx - barWidth - 24 : cx + 24;
+			int x = left ? cx - gap - barWidth : cx + gap;
 			int color = 0xFF000000 | team.rgb();
 			Component label = Component.translatable(team.translationKey());
 			if (i == s.team()) {
 				label = Component.translatable("hud.goblinforest.you", label);
 			}
-			int labelX = left ? x : x + barWidth - font.width(label);
-			g.text(font, label, labelX, y, color, true);
+			String coreText = String.valueOf((int) Math.ceil(s.coreHealth()[i]));
+			int labelSpace = barWidth - font.width(coreText) - 4;
+			String labelText = label.getString();
+			if (font.width(labelText) > labelSpace) {
+				labelText = font.plainSubstrByWidth(labelText, labelSpace - font.width("…")) + "…";
+			}
+			// Name außen, Lebenspunkte des Kerns innen (zur Uhr hin).
+			g.text(font, labelText, left ? x : x + barWidth - font.width(labelText), y, color, true);
+			g.text(font, coreText, left ? x + barWidth - font.width(coreText) : x, y, TEXT, true);
 			float core = s.coreMaxHealth()[i] <= 0 ? 0 : s.coreHealth()[i] / s.coreMaxHealth()[i];
 			bar(g, x, y + 10, barWidth, 6, core, color);
-			String coreText = (int) Math.ceil(s.coreHealth()[i]) + "";
-			g.text(font, coreText, left ? x + barWidth + 3 : x - 3 - font.width(coreText), y + 9, TEXT, true);
 			float tower = s.towerMaxHealth()[i] <= 0 ? 0 : s.towerHealth()[i] / s.towerMaxHealth()[i];
-			bar(g, x, y + 19, barWidth, 3, tower, tower > 0 ? 0xFFB0B0B0 : 0xFF505050);
+			bar(g, x, y + 18, barWidth, 3, tower, tower > 0 ? 0xFFB0B0B0 : 0xFF505050);
 		}
 	}
 
 	private static void drawResources(GuiGraphicsExtractor g, Font font, MatchStatePayload s) {
 		int x = 6;
-		int y = 6;
-		int w = 150;
+		int y = TOP_BAR_HEIGHT + 6;
+		int w = 140;
 		panel(g, x - 4, y - 4, w + 8, 98);
 		Component gold = Component.translatable("hud.goblinforest.gold", s.gold());
 		g.text(font, gold, x, y, GOLD, true);
@@ -151,9 +164,11 @@ public final class MatchHud {
 		for (AbilityType ability : AbilityType.values()) {
 			entries.add(new String[] {ability.id(), "ability:" + ability.id(), ability.translationKey()});
 		}
-		int w = 150;
+		int w = 112;
 		int x = g.guiWidth() - w - 6;
-		int y = g.guiHeight() - 6 - entries.size() * 12;
+		// Rechts unten neben der Hotbar; reicht der Platz dafür nicht, über Hotbar und Lebensleiste.
+		int bottom = x - 4 >= g.guiWidth() / 2 + 95 ? g.guiHeight() - 6 : g.guiHeight() - 48;
+		int y = bottom - entries.size() * 12;
 		panel(g, x - 4, y - 4, w + 8, entries.size() * 12 + 6);
 		for (String[] entry : entries) {
 			boolean rage = AbilityType.RAGE.id().equals(entry[0]);
@@ -211,9 +226,21 @@ public final class MatchHud {
 	}
 
 	/** Hinweise in der Bildschirmmitte oben: Sudden Death, Best-of-Stand, freie Fähigkeitspunkte. */
+	/** Fadenkreuz in der Bildmitte (dort landen Zauber und Sammelpunkt) und eine kurze Bedienhilfe. */
+	private static void drawCommandView(GuiGraphicsExtractor g, Font font) {
+		int cx = g.guiWidth() / 2;
+		int cy = g.guiHeight() / 2;
+		g.fill(cx - 6, cy, cx - 2, cy + 1, GOLD);
+		g.fill(cx + 2, cy, cx + 6, cy + 1, GOLD);
+		g.fill(cx, cy - 6, cx + 1, cy - 2, GOLD);
+		g.fill(cx, cy + 2, cx + 1, cy + 6, GOLD);
+		g.outline(cx - 1, cy - 1, 3, 3, GOLD);
+		g.centeredText(font, Component.translatable("hud.goblinforest.command_view", ModKeys.COMMAND_VIEW.getTranslatedKeyMessage()), cx, cy + 12, GOLD);
+	}
+
 	private static void drawNotices(GuiGraphicsExtractor g, Font font, MatchStatePayload s) {
 		int cx = g.guiWidth() / 2;
-		int y = 36;
+		int y = TOP_BAR_HEIGHT + 4;
 		if (s.bestOf() > 1) {
 			Component rounds = Component.translatable("hud.goblinforest.rounds", s.roundWins()[0], s.roundWins()[1], s.bestOf());
 			g.centeredText(font, rounds, cx, y, TEXT);
