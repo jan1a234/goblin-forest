@@ -1,0 +1,76 @@
+# Baut die Mod bei jedem Push und Pull Request.
+# - Push auf main: aktualisiert das Vorab-Release "dev" mit der neuesten .jar.
+# - Git-Tag v* (z. B. v0.1.0): erstellt ein richtiges Release mit der .jar als Download.
+
+name: build
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v6
+      - name: Gradle-Wrapper prüfen
+        uses: gradle/actions/wrapper-validation@v6
+      - name: JDK 25 einrichten
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'microsoft'
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v6
+      - name: Version bestimmen
+        id: version
+        run: |
+          base=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${base}+build.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+      - name: Bauen und testen
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build -Pmod_version="${{ steps.version.outputs.version }}"
+      - name: Build-Ergebnis hochladen
+        uses: actions/upload-artifact@v7
+        with:
+          name: goblinforest-${{ steps.version.outputs.version }}
+          path: build/libs/
+
+      - name: Entwicklungs-Release "dev" aktualisieren
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          jar=$(ls build/libs/goblinforest-*.jar | grep -v -- '-sources.jar')
+          gh release delete dev --yes --cleanup-tag || true
+          gh release create dev "$jar" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Entwicklungsversion $VERSION" \
+            --notes "Automatisch gebaut aus dem neuesten Stand von main (Commit $GITHUB_SHA). Noch nicht fertig, nur zum Testen. Benötigt Minecraft 26.2, Fabric Loader 0.19.5+ und Fabric API."
+
+      - name: Release erstellen
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          jar=$(ls build/libs/goblinforest-*.jar | grep -v -- '-sources.jar')
+          gh release create "$GITHUB_REF_NAME" "$jar" \
+            --title "Goblin Forest $GITHUB_REF_NAME" \
+            --generate-notes

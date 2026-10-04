@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"id": "goblinforest",
+	"version": "${version}",
+	"name": "Goblin Forest",
+	"description": "1-gegen-1-Lane-Strategie mit Goblin-Clans: Soldaten rekrutieren, aufleveln und die feindliche Festung stürmen.",
+	"authors": [
+		"jan1a234"
+	],
+	"contact": {
+		"homepage": "https://github.com/jan1a234/goblin-forest",
+		"sources": "https://github.com/jan1a234/goblin-forest",
+		"issues": "https://github.com/jan1a234/goblin-forest/issues"
+	},
+	"license": "MIT",
+	"icon": "assets/goblinforest/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"io.github.jan1a234.goblinforest.GoblinForest"
+		],
+		"client": [
+			"io.github.jan1a234.goblinforest.client.GoblinForestClient"
+		]
+	},
+	"mixins": [
+		"goblinforest.mixins.json",
+		{
+			"config": "goblinforest.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
