@@ -44,9 +44,9 @@ und kämpft mit eigenen Heldenfähigkeiten mit. Gegenüber dem Original kommen d
 | Aufbau | Arena wird in einer eigenen Dimension `goblinforest:arena` (leere Void-Welt) gebaut, Spieler werden teleportiert, Inventar wird gesichert und durch die Match-Ausrüstung ersetzt. Die normale Welt des Servers bleibt unberührt. | [MVP] |
 | Countdown | 10 s, beide Spieler sind in ihrer Festung eingefroren. | [MVP] |
 | Kampf | Echtzeit. Startgold 150, passives Einkommen +2 Gold/s. | [MVP] |
-| Sudden Death | Ab Minute 25 verlieren beide Festungen 0,5 % HP pro Sekunde, damit kein Match endlos dauert. | [Später] |
+| Sudden Death | Ab Minute 25 verlieren beide Festungen 0,5 % HP pro Sekunde, damit kein Match endlos dauert. | [v1.0] |
 | Ende | Festungskern auf 0 HP: Sieg-/Niederlage-Titel, Statistik im Chat (Kills, Gold, höchstes Einheitenlevel), nach 15 s Rückteleport und Inventar-Wiederherstellung. | [MVP] |
-| Weitere Modi | Best-of-3, 2v2, Match gegen KI-Clan. | [Später] |
+| Weitere Modi | Best-of-3/5 und Match gegen KI-Clan [v1.0] (Abschnitt 10a); 2v2 [Später]. | [v1.0] |
 
 ## 4. Arena
 
@@ -62,7 +62,7 @@ und kämpft mit eigenen Heldenfähigkeiten mit. Gegenüber dem Original kommen d
 |---|---|---|
 | Festungskern | 3000 HP. Fällt er, ist das Match verloren. Wird als Block-Entity mit Lebensbalken über dem Tor dargestellt. | [MVP] |
 | Turm | Schießt automatisch Pfeile auf Gegner in 24 Blöcken Reichweite (15 Schaden, 1 Schuss/s). Upgradebar. | [MVP] |
-| Kanone | Flächenschaden (40 Schaden, Radius 3, alle 4 s) auf Gruppen vor dem Tor. Muss erst gekauft werden. | [Später] |
+| Kanone | Flächenschaden (40 Schaden, Radius 3, alle 4 s) auf Gruppen vor dem Tor, 22 Blöcke Reichweite. Muss erst gekauft werden, jede weitere Stufe lädt schneller nach und trifft härter. | [v1.0] |
 | Kaserne | Spawnpunkt der Einheiten am Tor. | [MVP] |
 
 ## 5. Einheiten
@@ -173,7 +173,7 @@ Werden vom Spieler mit Blick auf eine Stelle gewirkt (Raycast bis 40 Blöcke). K
 ## 10. Steuerung und Kamera
 
 - **Third-Person erzwungen** während des Matches, Kamera hinter dem Spieler. [MVP] nutzt die normale Third-Person-Kamera (F5); [v1.0] Abstand mit Bild↑/Bild↓ von 3 bis 14 Blöcken einstellbar (Standard 7).
-- **Kommandoansicht** (Taste Tab): Kamera fährt hoch über das Schlachtfeld (Vogelperspektive), Spieler bleibt stehen. [Später]
+- **Kommandoansicht** (linke Alt-Taste; Tab ist in Minecraft schon die Spielerliste): Kamera fährt schräg über das Schlachtfeld, der Häuptling bleibt stehen. Bewegungstasten schwenken über die Lane (Sprinttaste doppelt so schnell), Bild↑/Bild↓ zoomt, die eigene Festung liegt immer links. Zauber und Sammelpunkt zielen auf die Bildmitte. Endet beim Tod des Häuptlings und am Rundenende. [v1.0]
 - **Kriegsmenü** (Taste B): Bildschirm mit Knöpfen wie die Leiste im Original, Tabs *Einheiten / Upgrades / Festung / Zauber* [MVP] und *Häuptling* (Fähigkeitsränge, Raserei) [v1.0], zeigt Kosten, Stufe, gesperrte Einträge und Erklärungen als Tooltip.
 - **Schnelltasten** (frei belegbar über die Minecraft-Tastenbelegung):
   - Einheiten rekrutieren: Z / X / C / V, dazu U / I / O / M für Schamane, Wolfsreiter, Troll und Katapult
@@ -191,6 +191,13 @@ Werden vom Spieler mit Blick auf eine Stelle gewirkt (Raycast bis 40 Blöcke). K
 - Die KI hat keinen Häuptling. Ausgleich über das Grundeinkommen: leicht ×0,8, normal ×1,15, schwer ×1,4 (+60 Startgold).
 - `/gf start bo3` / `bo5`: Best-of-Serie. Nach jeder Runde 20 s Pause, dann neue Runde mit frisch gebauter Arena; Spieler bleiben
   dabei in der Arena, ihre Sicherung von vor der ersten Runde wird erst am Ende der Serie zurückgegeben. Das HUD zeigt den Stand.
+
+## 10b. Klang [v1.0]
+
+- Eigene, per Code synthetisierte Klänge (`tools/generate_sounds.py`, keine fremden Aufnahmen): **Kriegstrommeln** als Schlachtmusik
+  (laufen über den Musik-Regler in Schleife, solange gekämpft wird; im Sudden Death schneller und lauter; die normale Minecraft-Musik
+  pausiert so lange), **Kriegshorn** zum Schlachtbeginn und beim Sammelruf, **Münzklimpern** beim Kopfgeld.
+- Countdown-, Kopfgeld- und Warnklänge hört nur der betroffene Spieler, nicht der Gegner nebenan.
 
 ## 11. Technischer Rahmen
 
@@ -220,7 +227,7 @@ Vor dem Bau die Versionen auf [fabricmc.net/develop](https://fabricmc.net/develo
   - Server → Client: `TeamStateSync` (Ressourcen, Upgrade-Stufen, Abklingzeiten, Festungs-HP), `MatchStateSync` (Phase, Timer, Ergebnis)
 - Kernklassen: `Match` (Zustandsmaschine Lobby → Aufbau → Countdown → Kampf → Ende), `TeamState`, `LaneDefinition`, `GoblinUnitEntity` (Basisklasse) mit Unterklassen je Typ, `UnitLeveling`, `UpgradeRegistry`, `SpellRegistry`, `ArenaBuilder`, `StrongholdBlockEntity`.
 - **Balancing-Werte in einer Datei** `data/goblinforest/balance.json` (Datapack-Ressource), damit Zahlen ohne Neukompilieren angepasst werden können.
-- Modelle: [MVP] vanilla-artige humanoide Modelle (kleiner skaliert) mit eigenen Goblin-Texturen in Clanfarben, keine Fremd-Mods außer Fabric API. [Später] eigene Modelle und Animationen.
+- Modelle: [MVP] vanilla-artige humanoide Modelle (kleiner skaliert) mit eigenen Goblin-Texturen in Clanfarben, keine Fremd-Mods außer Fabric API. [v1.0] Wolfsreiter sitzen auf einem großen, dunklen Warg (Wolfsmodell), Katapulte schieben einen Werfer-Karren. [Später] komplett eigene Modelle und Animationen.
 - Die Mod muss auf **Server und beiden Clients** installiert sein (zusammen mit Fabric API).
 
 ### 11.3 Build und Auslieferung
@@ -241,4 +248,4 @@ Damit zwei Spieler ein komplettes Match spielen können, wird genau das gebaut:
 8. Haltungen Vorrücken / Halten / Rückzug.
 9. Kriegsmenü (B), Schnelltasten, HUD, erzwungene Third-Person-Kamera.
 
-Alles mit **[Später]** folgt danach in dieser Reihenfolge: drei Lanes → Schamane, Troll, Wolfsreiter, Katapult → Champion-Fähigkeiten und Raserei → Kanone, Goldmine, weitere Zauber → Kommandoansicht → eigene Modelle/Animationen und Sounds → Sudden Death, Best-of-3, KI-Gegner.
+Mit dem Feinschliff (v1.0) dazugekommen: Schamane, Troll, Wolfsreiter, Katapult, Champion-Fähigkeiten und Raserei, Kanone, Goldmine, Wurzelfessel, Blitzsturm und Meteor, Kommandoansicht, eigene Klänge, Sudden Death, Best-of-Serien und KI-Gegner. Noch offen (**[Später]**): drei Lanes, 2v2, gestaltete Arena-Vorlage und komplett eigene Modelle.

@@ -41,20 +41,41 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Version: $version"
+      - name: Virtuellen Bildschirm für den Client-Test einrichten
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri > /dev/null
       # "build" führt auch die Gametests aus: ein komplettes Match auf einem echten Minecraft-Server.
       - name: Bauen und testen
         run: |
           chmod +x ./gradlew
           set -o pipefail
-          ./gradlew build -Pmod_version="${{ steps.version.outputs.version }}" 2>&1 | tee build.log
+          xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew build -Pmod_version="${{ steps.version.outputs.version }}" 2>&1 | tee build.log
+      # Startet einen echten Minecraft-Client, spielt ein Match an und macht Bildschirmfotos (ClientMatchGameTest).
+      - name: Client-Test mit Bildschirmfotos
+        run: |
+          set -o pipefail
+          if grep -q ":runClientGameTest" build.log; then echo "lief schon in build"; exit 0; fi
+          xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClientGameTest -Pmod_version="${{ steps.version.outputs.version }}" 2>&1 | tee client.log
+      - name: Bildschirmfotos einsammeln
+        if: always()
+        run: |
+          mkdir -p screenshots
+          find . -path ./screenshots -prune -o -name '*.png' -path '*screenshots*' -print -exec cp {} screenshots/ \; || true
+          ls -la screenshots
+      - name: Bildschirmfotos hochladen
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshots-${{ steps.version.outputs.version }}
+          path: screenshots/
+          if-no-files-found: ignore
       - name: Ergebnis des Match-Tests
         if: always()
-        run: grep -E "Selbsttest|required tests|tests? (passed|failed)|goblinforest-test:" build.log | tail -20 || true
+        run: grep -h -E "Selbsttest|required tests|tests? (passed|failed)|goblinforest-test:|[Cc]lient ?[Gg]ame ?[Tt]est" build.log client.log 2>/dev/null | tail -30 || true
       - name: Fehler zusammenfassen
         if: failure()
         run: |
           echo "===== FEHLER-ZUSAMMENFASSUNG ====="
-          grep -n -E "error:|Exception|Caused by|Description:|GameTest|gametest|FAILED|failed|ERROR|WARN.*goblinforest|[Dd]imension|arena|\[goblinforest" build.log | grep -v "fabric-gametest-api-v1:" | head -150
+          cat build.log client.log 2>/dev/null | grep -n -E "error:|Exception|Caused by|Description:|GameTest|gametest|FAILED|failed|ERROR|WARN.*goblinforest|[Dd]imension|arena|\[goblinforest|AssertionError|[Mm]ixin" | grep -v "fabric-gametest-api-v1:" | head -150
           echo "===== ENDE ====="
       - name: Build-Ergebnis hochladen
         uses: actions/upload-artifact@v7

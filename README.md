@@ -46,6 +46,7 @@ Die Kamera steht im Match fest in der Verfolgerperspektive, ihr Abstand lässt s
 | **J** / **K** | Feuerball / Heilende Pilze (kosten Gold) |
 | Hotbar 2–9 + Rechtsklick | Alle Zauber (auch Wurzelfessel, Blitzsturm, Meteor) und Fähigkeiten |
 | **Bild↑** / **Bild↓** | Kamera näher / weiter weg |
+| **Linke Alt-Taste** | Kommandoansicht: Kamera über dem Schlachtfeld, mit den Bewegungstasten schwenken; Zauber und Sammelpunkt zielen auf die Bildmitte |
 | Linksklick | Angreifen; auf Turm oder Festung des Gegners gehalten: Gebäude beschädigen |
 
 Gold kommt passiv und als Kopfgeld für getötete Goblins (mehr, je weiter vorne der Kill passiert). Kills bringen Clan-Erfahrung,
@@ -55,6 +56,9 @@ Mehrfachschuss der Bogenschützen). Der Häuptling selbst erreicht Stufe 10 und 
 
 Die Festung lässt sich ausbauen: Turm, Mauern, Hütten (mehr Armee), eine **Kanone** auf der Mauer und eine **Goldmine** im Hof.
 Dauert ein Match länger als 25 Minuten, beginnt der **Sudden Death**: beide Festungskerne verlieren dann langsam Leben.
+
+Während der Schlacht spielen eigene Kriegstrommeln (Lautstärke über den Musik-Regler). Für die Kommandoansicht lohnt sich eine
+Sichtweite von mindestens 10 Chunks, damit die ganze Arena zu sehen ist.
 
 Für Server-Betreiber: Die Mod legt die Dimension `goblinforest:arena` per Datenpaket an. Sie erscheint automatisch,
 auch in bestehenden Welten, sobald die Mod installiert ist.
