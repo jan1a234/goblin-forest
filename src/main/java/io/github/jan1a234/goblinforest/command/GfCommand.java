@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import io.github.jan1a234.goblinforest.GoblinForest;
+import io.github.jan1a234.goblinforest.game.AiDifficulty;
 import io.github.jan1a234.goblinforest.game.Match;
 import io.github.jan1a234.goblinforest.game.MatchManager;
 import io.github.jan1a234.goblinforest.game.TeamColor;
@@ -41,9 +42,11 @@ public final class GfCommand {
 					return send(context, MatchManager.leave(player));
 				}))
 				.then(Commands.literal("start")
-						.executes(context -> send(context, MatchManager.start(context.getSource().getServer(), context.getSource().getPlayer(), false)))
-						.then(Commands.literal("practice")
-								.executes(context -> send(context, MatchManager.start(context.getSource().getServer(), context.getSource().getPlayer(), true)))))
+						.executes(context -> start(context, ""))
+						.then(Commands.argument("options", StringArgumentType.greedyString())
+								.suggests((context, builder) -> SharedSuggestionProvider.suggest(new String[] {"practice", "ki", "ki leicht",
+										"ki normal", "ki schwer", "bo3", "bo5", "ki bo3", "ki schwer bo3"}, builder))
+								.executes(context -> start(context, StringArgumentType.getString(context, "options")))))
 				.then(Commands.literal("stop").executes(context -> {
 					CommandSourceStack source = context.getSource();
 					if (!isOperator(source) && !MatchManager.canStop(source.getPlayer())) {
@@ -99,8 +102,38 @@ public final class GfCommand {
 		return send(context, MatchManager.join(player, preference));
 	}
 
+	/**
+	 * {@code /gf start [practice] [ki [leicht|normal|schwer]] [bo3|bo5]}: Optionen in beliebiger Reihenfolge,
+	 * auch auf Englisch (ai, easy, hard).
+	 */
+	private static int start(CommandContext<CommandSourceStack> context, String options) {
+		boolean practice = false;
+		AiDifficulty ai = null;
+		int bestOf = 1;
+		for (String word : options.trim().split("\\s+")) {
+			String option = word.toLowerCase(java.util.Locale.ROOT);
+			if (option.isEmpty()) {
+				continue;
+			}
+			AiDifficulty difficulty = AiDifficulty.parse(option);
+			if (difficulty != null) {
+				ai = difficulty;
+			} else if (option.equals("ki") || option.equals("ai") || option.equals("bot")) {
+				ai = ai == null ? AiDifficulty.NORMAL : ai;
+			} else if (option.equals("practice") || option.equals("übung") || option.equals("uebung")) {
+				practice = true;
+			} else if (option.matches("bo[135]")) {
+				bestOf = option.charAt(2) - '0';
+			} else {
+				context.getSource().sendFailure(Component.translatable("command.goblinforest.unknown_option", word));
+				return 0;
+			}
+		}
+		return send(context, MatchManager.start(context.getSource().getServer(), context.getSource().getPlayer(), practice, ai, bestOf));
+	}
+
 	private static int help(CommandContext<CommandSourceStack> context) {
-		String[] keys = {"join", "leave", "start", "practice", "stop", "status", "reset", "controls", "keys", "keys2", "units"};
+		String[] keys = {"join", "leave", "start", "practice", "stop", "ai", "series", "status", "reset", "controls", "keys", "keys2", "units"};
 		context.getSource().sendSuccess(() -> Component.translatable("command.goblinforest.help.header").withStyle(ChatFormatting.GOLD), false);
 		for (String key : keys) {
 			context.getSource().sendSuccess(() -> Component.translatable("command.goblinforest.help." + key), false);

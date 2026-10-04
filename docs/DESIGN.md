@@ -182,6 +182,16 @@ Werden vom Spieler mit Blick auf eine Stelle gewirkt (Raycast bis 40 Blöcke). K
 - **HUD** [MVP]: oben links Gold / Erfahrung / Ruf / Bevölkerung, oben Mitte beide Festungs-Lebensbalken, unten rechts Abklingzeiten, Lebensbalken über Einheiten (mit Level-Sternen).
 - Die normale Hotbar und das Inventar sind im Match gesperrt (nur die Clan-Waffe).
 
+## 10a. KI-Gegner und Serien [v1.0]
+
+- `/gf start ki [leicht|normal|schwer]`: ein Clan wird von der KI geführt (Klasse `AiCommander`). Sie trifft alle 1–3 s eine Entscheidung:
+  Haltung (Rückzug, wenn deutlich unterlegen und der Feind in der eigenen Hälfte steht), Zauber auf die dichteste Gegnergruppe,
+  Upgrades und Ausbauten nach Bedarf (Hütten bei voller Armee, Mauern bei angeschlagener Festung, Kanone bei Angriff, Goldmine)
+  und Rekrutierung nach einer Soll-Mischung, die ab „normal“ auf die gegnerische Armee reagiert (Wolfsreiter gegen Fernkämpfer usw.).
+- Die KI hat keinen Häuptling. Ausgleich über das Grundeinkommen: leicht ×0,8, normal ×1,15, schwer ×1,4 (+60 Startgold).
+- `/gf start bo3` / `bo5`: Best-of-Serie. Nach jeder Runde 20 s Pause, dann neue Runde mit frisch gebauter Arena; Spieler bleiben
+  dabei in der Arena, ihre Sicherung von vor der ersten Runde wird erst am Ende der Serie zurückgegeben. Das HUD zeigt den Stand.
+
 ## 11. Technischer Rahmen
 
 ### 11.1 Versionen (Stand 04.10.2026, aus dem offiziellen [Fabric-Example-Mod, Branch 26.2](https://github.com/FabricMC/fabric-example-mod/tree/26.2) und [fabricmc.net](https://fabricmc.net/2026/06/15/262.html))

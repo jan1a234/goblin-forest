@@ -119,15 +119,18 @@ public final class Match {
 	private final UnitCombat combat;
 	private final Bounty bounty;
 	private final boolean practice;
+	private final MatchOptions options;
+	/** Clan, den die KI führt (null ohne KI). */
+	private final TeamColor aiTeam;
+	private final AiCommander ai;
+	/** Die Runde ist vorbei, die Serie geht weiter: Spieler bleiben in der Arena. */
+	private boolean nextRound;
 	private final EnumMap<TeamColor, TeamState> teams = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, List<ArenaLayout.Point>> waypoints = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, Vec3> rallyPoints = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, Integer> coreStages = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, Integer> towerCooldowns = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, Integer> cannonCooldowns = new EnumMap<>(TeamColor.class);
-	/** Best-of-Serie: gewonnene Runden je Clan und Anzahl der Runden (1 = einzelnes Match). */
-	private final EnumMap<TeamColor, Integer> roundWins = new EnumMap<>(TeamColor.class);
-	private int bestOf = 1;
 	private final EnumMap<TeamColor, Integer> lastReputation = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, Integer> offlineTicks = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, PlayerTeam> scoreboardTeams = new EnumMap<>(TeamColor.class);
@@ -144,12 +147,17 @@ public final class Match {
 	private boolean finished;
 
 	Match(MinecraftServer server, ServerLevel arena, Map<UUID, TeamColor> players, Map<UUID, String> names, boolean practice) {
+		this(server, arena, players, names, MatchOptions.single(practice));
+	}
+
+	Match(MinecraftServer server, ServerLevel arena, Map<UUID, TeamColor> players, Map<UUID, String> names, MatchOptions options) {
 		this.server = server;
 		this.arena = arena;
 		this.balance = GoblinForest.balance();
 		this.combat = new UnitCombat(balance);
 		this.bounty = new Bounty(balance.economy());
-		this.practice = practice;
+		this.options = options;
+		this.practice = options.practice() || options.ai() != null;
 		for (TeamColor team : TeamColor.values()) {
 			teams.put(team, new TeamState(team, balance));
 			waypoints.put(team, ArenaLayout.laneWaypoints(team));
@@ -160,6 +168,16 @@ public final class Match {
 			offlineTicks.put(team, 0);
 		}
 		players.forEach((uuid, team) -> heroes.put(uuid, new Hero(uuid, names.getOrDefault(uuid, "?"), team)));
+		if (options.ai() != null) {
+			aiTeam = players.containsValue(TeamColor.GREEN) && !players.containsValue(TeamColor.RED) ? TeamColor.RED : TeamColor.GREEN;
+			TeamState state = teams.get(aiTeam);
+			state.setIncomeMultiplier(options.ai().incomeMultiplier());
+			state.addGold(options.ai().bonusStartGold());
+			ai = new AiCommander(this, aiTeam, options.ai());
+		} else {
+			aiTeam = null;
+			ai = null;
+		}
 	}
 
 	// ================================================================ Abfragen für Einheiten und Ereignisse
@@ -190,6 +208,33 @@ public final class Match {
 
 	public boolean practice() {
 		return practice;
+	}
+
+	public MatchOptions options() {
+		return options;
+	}
+
+	/** Clan der KI oder null. */
+	public TeamColor aiTeam() {
+		return aiTeam;
+	}
+
+	/** Diese Runde ist vorbei und die Best-of-Serie geht mit einer neuen Runde weiter. */
+	public boolean continuesSeries() {
+		return nextRound;
+	}
+
+	/** Spieler und ihre Clans, für die nächste Runde einer Serie. */
+	Map<UUID, TeamColor> assignment() {
+		Map<UUID, TeamColor> map = new LinkedHashMap<>();
+		heroes.forEach((uuid, hero) -> map.put(uuid, hero.team));
+		return map;
+	}
+
+	Map<UUID, String> names() {
+		Map<UUID, String> map = new LinkedHashMap<>();
+		heroes.forEach((uuid, hero) -> map.put(uuid, hero.name));
+		return map;
 	}
 
 	public ServerLevel arena() {
@@ -271,7 +316,7 @@ public final class Match {
 		return list;
 	}
 
-	private List<ServerPlayer> onlineHeroes(TeamColor team) {
+	List<ServerPlayer> onlineHeroes(TeamColor team) {
 		List<ServerPlayer> list = new ArrayList<>();
 		for (Hero hero : heroes.values()) {
 			if (hero.team == team) {
@@ -367,6 +412,9 @@ public final class Match {
 		tickTowers();
 		tickCannons();
 		tickHeroes();
+		if (ai != null) {
+			ai.tick(tick);
+		}
 		if (tick % 20 == 0) {
 			recountPopulation();
 			checkReputation();
@@ -378,13 +426,13 @@ public final class Match {
 		}
 	}
 
-	/** Sekunden bis Sudden Death (negativ, sobald er läuft). */
+	/** Gewonnene Runden eines Clans in der laufenden Best-of-Serie (0 ohne Serie). */
 	public int roundWins(TeamColor team) {
-		return roundWins.getOrDefault(team, 0);
+		return options.series() == null ? 0 : options.series().wins(team);
 	}
 
 	public int bestOf() {
-		return bestOf;
+		return options.bestOf();
 	}
 
 	/** Sekunden bis zum Sudden Death; 0, sobald er läuft; -1, wenn er abgeschaltet ist. */
@@ -430,8 +478,18 @@ public final class Match {
 
 	private void tickEnded() {
 		if (--phaseTicks <= 0) {
-			finish(null);
+			if (nextRound) {
+				finishRound();
+			} else {
+				finish(null);
+			}
 			return;
+		}
+		if (nextRound && phaseTicks % 20 == 0 && phaseTicks <= 10 * 20) {
+			for (ServerPlayer player : onlineHeroes()) {
+				player.sendOverlayMessage(Component.translatable("message.goblinforest.next_round_in",
+						options.series().round(), phaseTicks / 20).withStyle(ChatFormatting.GOLD));
+			}
 		}
 		if (winner != null && phaseTicks % 15 == 0 && phaseTicks > balance.match().endDelaySeconds() * 20 - 120) {
 			ArenaLayout.Point core = ArenaLayout.coreBox(winner.opponent()).center();
@@ -618,6 +676,16 @@ public final class Match {
 	}
 
 	private void restoreHero(ServerPlayer player) {
+		clearHeroEffects(player);
+		setFrozen(player, false);
+		server.getScoreboard().removePlayerFromTeam(player.getScoreboardName());
+		player.closeContainer();
+		PlayerBackup.restore(player);
+		ServerPlayNetworking.send(player, MatchStatePayload.none());
+	}
+
+	/** Entfernt alle Match-Modifikatoren und Effekte vom Spieler. */
+	private void clearHeroEffects(ServerPlayer player) {
 		removeModifier(player, Attributes.MAX_HEALTH, HEALTH_MODIFIER);
 		removeModifier(player, Attributes.ATTACK_DAMAGE, DAMAGE_MODIFIER);
 		removeModifier(player, Attributes.ATTACK_SPEED, ATTACK_SPEED_MODIFIER);
@@ -627,12 +695,7 @@ public final class Match {
 		removeModifier(player, Attributes.ATTACK_DAMAGE, RAGE_DAMAGE_MODIFIER);
 		removeModifier(player, Attributes.MOVEMENT_SPEED, RAGE_SPEED_MODIFIER);
 		removeModifier(player, Attributes.CAMERA_DISTANCE, CAMERA_MODIFIER);
-		setFrozen(player, false);
-		server.getScoreboard().removePlayerFromTeam(player.getScoreboardName());
 		player.removeAllEffects();
-		player.closeContainer();
-		PlayerBackup.restore(player);
-		ServerPlayNetworking.send(player, MatchStatePayload.none());
 	}
 
 	private void tickHeroes() {
@@ -809,7 +872,7 @@ public final class Match {
 
 	// ================================================================ Einheiten
 
-	private PurchaseResult recruit(TeamColor team, UnitType type) {
+	PurchaseResult recruit(TeamColor team, UnitType type) {
 		TeamState state = teams.get(team);
 		PurchaseResult result = state.recruit(type, livingUnits(team));
 		if (!result.ok()) {
@@ -1415,7 +1478,7 @@ public final class Match {
 		}
 	}
 
-	private void setStance(TeamColor team, Stance stance) {
+	void setStance(TeamColor team, Stance stance) {
 		teams.get(team).setStance(stance);
 		if (stance != Stance.HOLD) {
 			rallyPoints.remove(team);
@@ -1859,10 +1922,13 @@ public final class Match {
 	// ================================================================ Ende
 
 	private void checkForfeit() {
-		if (practice) {
+		if (practice && ai == null) {
 			return;
 		}
 		for (TeamColor team : TeamColor.values()) {
+			if (team == aiTeam) {
+				continue;
+			}
 			boolean anyOnline = !onlineHeroes(team).isEmpty();
 			int ticks = anyOnline ? 0 : offlineTicks.get(team) + 20;
 			offlineTicks.put(team, ticks);
@@ -1884,6 +1950,14 @@ public final class Match {
 		phase = MatchPhase.ENDED;
 		winner = winningTeam;
 		phaseTicks = balance.match().endDelaySeconds() * 20;
+		Series series = options.series();
+		if (series != null) {
+			series.record(winningTeam);
+			nextRound = !series.decided();
+			if (nextRound) {
+				phaseTicks = Math.max(phaseTicks, balance.match().roundBreakSeconds() * 20);
+			}
+		}
 		TeamColor loser = winningTeam.opponent();
 		if (teams.get(loser).coreDestroyed()) {
 			coreStages.put(loser, 4);
@@ -1895,10 +1969,20 @@ public final class Match {
 			if (hero.dead) {
 				respawnHero(player, hero);
 			}
-			title(player, Component.translatable(won ? "title.goblinforest.victory" : "title.goblinforest.defeat")
-							.withStyle(won ? ChatFormatting.GOLD : ChatFormatting.DARK_RED, ChatFormatting.BOLD),
-					Component.translatable("title.goblinforest.winner", Component.translatable(winningTeam.translationKey()).withColor(winningTeam.rgb())),
-					10, 100, 20);
+			Component winnerName = Component.translatable(winningTeam.translationKey()).withColor(winningTeam.rgb());
+			if (series == null) {
+				title(player, Component.translatable(won ? "title.goblinforest.victory" : "title.goblinforest.defeat")
+								.withStyle(won ? ChatFormatting.GOLD : ChatFormatting.DARK_RED, ChatFormatting.BOLD),
+						Component.translatable("title.goblinforest.winner", winnerName), 10, 100, 20);
+			} else {
+				Component score = Component.translatable("title.goblinforest.series_score", series.wins(TeamColor.RED), series.wins(TeamColor.GREEN));
+				String key = nextRound ? (won ? "title.goblinforest.round_won" : "title.goblinforest.round_lost")
+						: (won ? "title.goblinforest.series_won" : "title.goblinforest.series_lost");
+				title(player, Component.translatable(key).withStyle(won ? ChatFormatting.GOLD : ChatFormatting.DARK_RED, ChatFormatting.BOLD),
+						score, 10, 100, 20);
+				player.sendSystemMessage(Component.translatable(nextRound ? "message.goblinforest.round_result" : "message.goblinforest.series_result",
+						winnerName, series.wins(TeamColor.RED), series.wins(TeamColor.GREEN), series.bestOf()).withStyle(ChatFormatting.GOLD));
+			}
 			playTo(player, won ? SoundEvents.UI_TOAST_CHALLENGE_COMPLETE : SoundEvents.WITHER_SPAWN, 1.0f, won ? 1.0f : 0.6f);
 		}
 		sendStatistics();
@@ -1929,6 +2013,31 @@ public final class Match {
 	private static String formatTime(long ticks) {
 		long seconds = ticks / 20;
 		return String.format("%d:%02d", seconds / 60, seconds % 60);
+	}
+
+	/**
+	 * Schließt eine Runde einer Serie ab: Einheiten und Effekte weg, aber die Spieler bleiben in der Arena
+	 * (ihre Sicherung bleibt bestehen), bis die nächste Runde sie wieder aufstellt.
+	 */
+	private void finishRound() {
+		if (finished) {
+			return;
+		}
+		finished = true;
+		for (ServerPlayer player : onlineHeroes()) {
+			Hero hero = heroes.get(player.getUUID());
+			if (hero.prepared) {
+				clearHeroEffects(player);
+				setFrozen(player, true);
+			}
+		}
+		for (GoblinUnit unit : units) {
+			unit.discard();
+		}
+		units.clear();
+		clearArenaEntities();
+		removeScoreboardTeams();
+		scheduled.clear();
 	}
 
 	/** Bricht das Match ab (oder schließt es nach dem Ende): alle Spieler zurück, Arena aufräumen. */
@@ -2059,6 +2168,11 @@ public final class Match {
 		List<Component> lines = new ArrayList<>();
 		lines.add(Component.translatable("command.goblinforest.status.phase", Component.translatable("phase.goblinforest." + phase.name().toLowerCase()),
 				formatTime(battleTicks)));
+		if (options.series() != null) {
+			Series series = options.series();
+			lines.add(Component.translatable("command.goblinforest.status.series", series.round(), series.bestOf(),
+					series.wins(TeamColor.RED), series.wins(TeamColor.GREEN)));
+		}
 		for (TeamColor team : TeamColor.values()) {
 			TeamState state = teams.get(team);
 			List<String> names = new ArrayList<>();
@@ -2066,6 +2180,9 @@ public final class Match {
 				if (hero.team == team) {
 					names.add(hero.name);
 				}
+			}
+			if (team == aiTeam) {
+				names.add(Component.translatable("command.goblinforest.status.ai", Component.translatable(options.ai().translationKey())).getString());
 			}
 			lines.add(Component.translatable("command.goblinforest.status.team",
 					Component.translatable(team.translationKey()).withColor(team.rgb()),
@@ -2086,8 +2203,8 @@ public final class Match {
 		return recruit(team, type);
 	}
 
-	/** Für den Selbsttest: Verbesserung kaufen, als hätte ein Spieler sie bestellt (inklusive Bauwerken). */
-	public PurchaseResult upgradeForTest(TeamColor team, UpgradeKey key) {
+	/** Verbesserung für einen Clan kaufen, als hätte ein Spieler sie bestellt (inklusive Bauwerken); für KI und Selbsttest. */
+	public PurchaseResult buyUpgradeFor(TeamColor team, UpgradeKey key) {
 		PurchaseResult result = teams.get(team).buyUpgrade(key);
 		if (result.ok()) {
 			onUpgradeBought(team, key);
@@ -2095,15 +2212,38 @@ public final class Match {
 		return result;
 	}
 
-	/** Für den Selbsttest: Zauber ohne Häuptling auf einen Punkt wirken (bezahlt wie ein echter Zauber). */
-	public PurchaseResult castForTest(TeamColor team, SpellType spell, Vec3 target) {
+	/**
+	 * Zauber ohne Häuptling auf einen Punkt wirken (bezahlt wie ein echter Zauber); für KI und Selbsttest.
+	 * Der Zauber geht vom eigenen Turm aus, oder vom Festungskern, wenn der Turm gefallen ist.
+	 */
+	public PurchaseResult castSpellFor(TeamColor team, SpellType spell, Vec3 target) {
 		TeamState state = teams.get(team);
 		PurchaseResult result = state.checkCast(spell, tick);
 		if (result.ok()) {
 			state.payCast(spell, tick);
-			releaseSpell(team, spell, target.add(0, 3, 0), target, null);
+			ArenaLayout.Point origin = state.towerAlive() ? ArenaLayout.towerMuzzle(team) : ArenaLayout.coreBox(team).center();
+			releaseSpell(team, spell, spell == SpellType.FIREBALL ? vec(origin) : target.add(0, 3, 0), target, null);
 		}
 		return result;
+	}
+
+	/** Lebende Einheiten eines Clans. */
+	public List<GoblinUnit> unitsOf(TeamColor team) {
+		List<GoblinUnit> list = new ArrayList<>();
+		for (GoblinUnit unit : units) {
+			if (unit.isAlive() && unit.team() == team) {
+				list.add(unit);
+			}
+		}
+		return list;
+	}
+
+	public long battleTicks() {
+		return battleTicks;
+	}
+
+	public long currentTick() {
+		return tick;
 	}
 
 	public int unitCount() {
