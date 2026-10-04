@@ -17,10 +17,5 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew -q printCp --no-configuration-cache > cp.txt
-          CP=$(grep '^CP=' cp.txt | cut -c4-)
-          for j in ${CP//:/ }; do case "$j" in *.jar) unzip -Z1 "$j" '*.class' 2>/dev/null;; esac; done | sed 's/\.class$//' | sort -u > classes.txt
-          wc -l classes.txt
-          echo "=====PROBE-START"
-          while read -r pat; do [ -z "$pat" ] && continue; echo "## grep $pat"; grep -E "$pat" classes.txt | head -60; done < probe/grep.txt
-          while read -r c; do [ -z "$c" ] && continue; echo "## javap $c"; javap -public -cp "$CP" "$c" 2>&1 | grep -v '^Compiled from'; done < probe/javap.txt
-          echo "=====PROBE-END"
+          if grep -q '^src ' probe/cmds.txt; then ./gradlew -q genSources --no-configuration-cache > /dev/null 2>&1 || echo "genSources fehlgeschlagen"; fi
+          bash probe/run.sh

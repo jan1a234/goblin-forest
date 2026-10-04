@@ -1,0 +1,117 @@
+grep ^net/fabricmc/fabric/api/.*/(PayloadTypeRegistry|ServerPlayNetworking|ClientPlayNetworking|KeyBindingHelper|KeyMappingHelper|HudElementRegistry|VanillaHudElements|HudElement|EntityRendererRegistry|EntityModelLayerRegistry|FabricDefaultAttributeRegistry|ServerTickEvents|ClientTickEvents|ServerLivingEntityEvents|UseItemCallback|AttackBlockCallback|AttackEntityCallback|ServerPlayConnectionEvents|ServerLifecycleEvents|ServerEntityEvents|PlayerBlockBreakEvents|ServerPlayerEvents|UseBlockCallback|UseEntityCallback|ClientPlayConnectionEvents|FabricEntityType.*|ServerEntityWorldChangeEvents|ServerWorldEvents|ServerLevelEvents|ItemTooltipCallback|ServerMessageDecoratorEvent|ServerMessageEvents|EntitySleepEvents|LevelRenderEvents|WorldRenderEvents|EntityTrackingEvents)$
+grep ^net/minecraft/client/renderer/entity/(Piglin.*|AbstractSkeletonRenderer|SkeletonRenderer|ArmorModelSet|EntityRenderers|AgeableMobRenderer|MobRenderer|LivingEntityRenderer|EntityRenderer)$
+grep ^net/minecraft/client/renderer/entity/state/(Piglin.*|Skeleton.*|ArmedEntityRenderState|LivingEntityRenderState|EntityRenderState)$
+grep ^net/minecraft/client/model/.*(Piglin|Humanoid|Skeleton|Zombie)[A-Za-z]*$
+grep ^net/minecraft/client/gui/(Gui|Font|GuiGraphicsExtractor)$
+grep ^net/minecraft/server/permissions/
+grep ^net/minecraft/world/entity/ai/(goal/(Goal|LookAtPlayerGoal|FloatGoal|RandomLookAroundGoal)|navigation/.*|control/(LookControl|MoveControl))$
+grep ^net/minecraft/world/item/component/[A-Z][A-Za-z]*$
+grep ^net/minecraft/world/entity/(Relative|EntitySpawnReason|MobCategory|EquipmentSlot|HumanoidArm|EntityDimensions)$
+grep ^net/minecraft/world/entity/monster/piglin/
+grep ^net/minecraft/network/protocol/game/Clientbound(SetTitle|SetSubtitle|SetTitlesAnimation|Sound|LevelParticles)[A-Za-z]*$
+javap net.minecraft.world.entity.LivingEntity
+javap net.minecraft.world.entity.Mob
+javap net.minecraft.world.entity.PathfinderMob
+javap net.minecraft.world.entity.Entity
+javap net.minecraft.world.entity.player.Player
+javap net.minecraft.world.entity.ai.attributes.Attributes
+javap net.minecraft.world.entity.ai.attributes.AttributeSupplier$Builder
+javap net.minecraft.world.entity.ai.attributes.AttributeInstance
+javap net.minecraft.world.entity.ai.attributes.AttributeModifier
+javap net.minecraft.world.entity.ai.attributes.AttributeModifier$Operation
+javap net.minecraft.world.entity.ai.navigation.PathNavigation
+javap net.minecraft.world.entity.ai.control.LookControl
+javap net.minecraft.network.syncher.SynchedEntityData
+javap net.minecraft.network.syncher.SynchedEntityData$Builder
+javap net.minecraft.network.syncher.EntityDataSerializers (BYTE|INT|FLOAT|BOOLEAN|STRING)
+javap net.minecraft.server.level.ServerLevel
+javap net.minecraft.world.level.Level
+javap net.minecraft.server.MinecraftServer (getLevel|overworld|getPlayerList|levelKeys|getAllLevels|execute|getTickCount|getWorldPath|isDedicated|registryAccess)
+javap net.minecraft.server.players.PlayerList (getPlayers|getPlayer|broadcast|isOp)
+javap net.minecraft.world.level.portal.TeleportTransition
+javap net.minecraft.world.entity.Relative
+javap net.minecraft.world.BossEvent$BossBarColor
+javap net.minecraft.world.BossEvent$BossBarOverlay
+javap net.minecraft.server.permissions.PermissionSet
+javap net.minecraft.server.permissions.PermissionCheck
+javap net.minecraft.world.InteractionResult
+javap net.minecraft.core.component.DataComponents
+javap net.minecraft.world.item.component.CustomData
+javap net.minecraft.world.item.component.DyedItemColor
+javap net.minecraft.world.item.component.ItemAttributeModifiers
+javap net.minecraft.world.item.component.ItemLore
+javap net.minecraft.world.item.component.TooltipDisplay
+javap net.minecraft.world.effect.MobEffects (INVISIBILITY|SPEED|SLOWNESS|GLOWING|STRENGTH|RESISTANCE|HASTE|REGENERATION|class)
+javap net.minecraft.world.effect.MobEffectInstance (public net)
+javap net.minecraft.core.particles.ParticleTypes
+javap net.minecraft.sounds.SoundEvents (ARROW_SHOOT|GENERIC_EXPLODE|FIRECHARGE|BLAZE_SHOOT|ANVIL_LAND|PLAYER_LEVELUP|UI_BUTTON_CLICK|NOTE_BLOCK|EXPERIENCE_ORB|RAID_HORN|GOAT_HORN|WITHER_SPAWN|ENDER_DRAGON_GROWL|TOTEM_USE|PIGLIN|GENERIC_HURT|ZOMBIE_ATTACK_WOODEN|IRON_GOLEM|VILLAGER_NO|ITEM_BREAK|BELL|AMETHYST|EVOKER|ILLUSIONER|TRIDENT_THUNDER|PLAYER_ATTACK)
+javap net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket
+javap net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket
+javap net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket
+javap net.minecraft.world.level.ClipContext
+javap net.minecraft.world.phys.HitResult
+javap net.minecraft.world.phys.BlockHitResult
+javap net.minecraft.network.chat.Component
+javap net.minecraft.network.chat.MutableComponent
+javap net.minecraft.network.codec.StreamCodec (static|interface)
+javap net.minecraft.network.codec.ByteBufCodecs (static final)
+javap net.minecraft.network.protocol.common.custom.CustomPacketPayload
+javap net.minecraft.network.protocol.common.custom.CustomPacketPayload$Type
+javap net.minecraft.world.scores.Scoreboard (PlayerTeam|addPlayerToTeam|removePlayerFromTeam|getPlayersTeam|addPlayerTeam|removePlayerTeam)
+javap net.minecraft.world.scores.PlayerTeam (set|get)
+javap net.minecraft.world.level.GameType
+javap net.minecraft.world.level.block.state.BlockBehaviour$BlockStateBase (isAir|isSolid|is\(|getBlock)
+javap net.minecraft.world.food.FoodData (set|get)
+javap net.minecraft.world.entity.projectile.arrow.AbstractArrow$Pickup
+javap net.minecraft.world.entity.projectile.Projectile (shoot|setOwner|getOwner)
+javap net.minecraft.world.item.ItemStack (set|get)
+javap net.minecraft.world.item.Items (WOODEN_SWORD|IRON_AXE|BOW|IRON_SWORD|STONE_AXE|FIRE_CHARGE|RED_MUSHROOM|BLAZE_POWDER|NETHERITE_AXE|LEATHER|IRON_HELMET|GOLDEN|GOAT_HORN|BLAZE_ROD|STONE_SWORD|WOODEN_AXE|ARROW|TOTEM|COMPASS|WRITABLE|BOOK|IRON_INGOT|GOLD_INGOT|HEART|NETHER_STAR|MUSHROOM)
+javap net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking$Context
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking$PlayPayloadHandler
+javap net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
+javap net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking$Context
+javap net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents
+javap net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents$AllowDamage
+javap net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents$AllowDeath
+javap net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents$AfterDeath
+javap net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents
+javap net.fabricmc.fabric.api.event.player.UseItemCallback
+javap net.fabricmc.fabric.api.event.player.AttackBlockCallback
+javap net.fabricmc.fabric.api.event.player.AttackEntityCallback
+javap net.fabricmc.fabric.api.event.player.UseBlockCallback
+javap net.fabricmc.fabric.api.event.player.UseEntityCallback
+javap net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents$Before
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents$Join
+javap net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents$Disconnect
+javap net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
+javap net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
+javap net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry
+javap net.minecraft.core.Registry (static)
+javap net.minecraft.core.registries.Registries (ENTITY_TYPE|DIMENSION|LEVEL_STEM|DIMENSION_TYPE)
+javap net.minecraft.core.registries.BuiltInRegistries (ENTITY_TYPE)
+javap net.minecraft.resources.ResourceKey (static)
+javap net.minecraft.client.gui.GuiGraphicsExtractor
+javap net.minecraft.client.gui.Font (public|width|lineHeight)
+javap net.minecraft.client.Minecraft (public [a-z]|getInstance|setScreen|getWindow|options|player|level)
+javap net.minecraft.client.Options (CameraType|key[A-Z])
+javap net.minecraft.client.CameraType
+javap net.minecraft.client.gui.screens.Screen
+javap net.minecraft.client.gui.components.AbstractWidget
+javap net.minecraft.client.gui.components.Tooltip (static)
+javap net.minecraft.client.renderer.entity.HumanoidMobRenderer
+javap net.minecraft.client.renderer.entity.LivingEntityRenderer
+javap net.minecraft.client.renderer.entity.MobRenderer
+javap net.minecraft.client.renderer.entity.AgeableMobRenderer
+javap net.minecraft.client.renderer.entity.EntityRenderers (static)
+javap net.minecraft.client.renderer.entity.ArmorModelSet
+javap net.minecraft.client.renderer.entity.state.LivingEntityRenderState
+javap net.minecraft.client.renderer.entity.state.ArmedEntityRenderState
+javap net.minecraft.client.model.HumanoidModel
+javap net.minecraft.client.model.HumanoidModel$ArmPose
+javap com.mojang.blaze3d.platform.InputConstants (KEY_[A-Z]$|KEY_[A-Z];|Type|MOUSE)
+src net.minecraft.client.renderer.entity.PiglinRenderer
+src net.minecraft.client.renderer.entity.AbstractSkeletonRenderer
+src net.minecraft.client.renderer.entity.SkeletonRenderer
