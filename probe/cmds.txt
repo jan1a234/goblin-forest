@@ -1,12 +1,14 @@
-grep client/model/.*[Ww]olf
-grep client/renderer/entity/.*[Ww]olf
-src net.minecraft.client.renderer.entity.WolfRenderer
-src net.minecraft.client.renderer.entity.state.WolfRenderState
-grep renderer/entity/layers/.*Saddle
-src net.minecraft.client.renderer.entity.layers.RenderLayer (static|public|protected)
-src net.minecraft.client.renderer.SubmitNodeCollector (submitModel|interface|void)
-src net.minecraft.client.renderer.entity.layers.SimpleEquipmentLayer
-src net.minecraft.client.renderer.entity.LivingEntityRenderer (submit|setupRotations|scale\(|translate|bodyRot)
-grep sounds/.*SoundEvents$
-src net.minecraft.sounds.SoundEvent (static|public)
-src net.minecraft.sounds.SoundEvents (private static|register\()
+src net.minecraft.client.renderer.OrderedSubmitNodeCollector (submitModel|<S>|void submit)
+src net.minecraft.client.renderer.entity.state.LivingEntityRenderState (public|float|boolean)
+src net.minecraft.client.renderer.entity.state.EntityRenderState (public [a-zA-Z@]|^\s+public)
+src net.minecraft.client.model.animal.wolf.WolfModel (public|setupAnim|class)
+src net.minecraft.client.model.animal.wolf.AdultWolfModel (public|setupAnim|class)
+src net.minecraft.client.model.EntityModel (public|protected)
+src net.minecraft.client.resources.sounds.SimpleSoundInstance (public static|public SimpleSoundInstance)
+src net.minecraft.client.resources.sounds.AbstractTickableSoundInstance
+src net.minecraft.client.resources.sounds.AbstractSoundInstance (protected|public)
+src net.minecraft.client.sounds.SoundManager (public void|public boolean)
+src net.minecraft.network.protocol.game.ClientboundSoundPacket (public ClientboundSoundPacket)
+src net.minecraft.server.level.ServerPlayer (Sound|sound)
+src net.minecraft.client.renderer.entity.LivingEntityRenderer (getOverlayCoords|static)
+src net.minecraft.client.sounds.MusicManager (public)
