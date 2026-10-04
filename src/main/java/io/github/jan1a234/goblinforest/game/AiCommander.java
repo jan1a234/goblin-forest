@@ -261,7 +261,9 @@ final class AiCommander {
 				best = key;
 			}
 		}
-		if (best == null || bestScore < 1.0) {
+		// Mit vollem Beutel lohnen sich auch kleinere Verbesserungen.
+		double threshold = state.gold() > 500 ? 0.3 : 1.0;
+		if (best == null || bestScore < threshold) {
 			return;
 		}
 		int cost = state.nextUpgradeCost(best);

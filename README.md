@@ -22,6 +22,13 @@ Test im Spiel: `/gf` zeigt die installierte Version.
 3. Ziel: den **Festungskern** des anderen Clans zerstören. Wer seinen Kern verliert, verliert das Match.
 
 Alleine ausprobieren: `/gf start practice` (der zweite Clan bleibt leer).
+
+**Gegen die KI:** `/gf start ki` (oder `ki leicht`, `ki normal`, `ki schwer`). Die KI führt einen eigenen Clan, rekrutiert eine
+gemischte Armee (ab „normal“ gezielt gegen deine), baut ihre Festung aus und wirkt Zauber. Sie hat keinen Häuptling auf dem Feld
+und bekommt dafür je nach Stufe mehr oder weniger Gold. Mehrere Spieler können zusammen gegen die KI antreten.
+
+**Best of 3 oder 5:** `/gf start bo3` bzw. `/gf start bo5`. Jede Runde beginnt mit frischer Arena; zwischen den Runden bleiben
+alle in der Arena. Kombinierbar, z. B. `/gf start ki schwer bo3`.
 Notfall: `/gf stop` bricht ein Match ab, `/gf reset` (Operatoren) holt alle Spieler zurück. `/gf help` zeigt alle Befehle.
 
 ### Steuerung
