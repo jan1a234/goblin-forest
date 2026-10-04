@@ -21,4 +21,13 @@ public enum UnitType {
 	public String translationKey() {
 		return "unit.goblinforest." + id;
 	}
+
+	public static UnitType byId(String id) {
+		for (UnitType type : values()) {
+			if (type.id.equals(id)) {
+				return type;
+			}
+		}
+		return null;
+	}
 }
