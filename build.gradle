@@ -67,3 +67,8 @@ jar {
 		rename { "${it}_$projectName" }
 	}
 }
+
+tasks.register('printCp') {
+	def cp = sourceSets.client.compileClasspath
+	doLast { println "CP=" + cp.asPath }
+}

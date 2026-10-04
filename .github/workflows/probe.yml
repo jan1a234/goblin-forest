@@ -1,0 +1,26 @@
+# Temporärer Hilfs-Workflow: gibt API-Signaturen von Minecraft/Fabric aus (nur auf dem Branch dev/api-probe).
+name: api-probe
+on:
+  push:
+    branches: ['dev/api-probe']
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'microsoft'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Probe
+        run: |
+          chmod +x ./gradlew
+          ./gradlew -q printCp --no-configuration-cache > cp.txt
+          CP=$(grep '^CP=' cp.txt | cut -c4-)
+          for j in ${CP//:/ }; do case "$j" in *.jar) unzip -Z1 "$j" '*.class' 2>/dev/null;; esac; done | sed 's/\.class$//' | sort -u > classes.txt
+          wc -l classes.txt
+          echo "=====PROBE-START"
+          while read -r pat; do [ -z "$pat" ] && continue; echo "## grep $pat"; grep -E "$pat" classes.txt | head -60; done < probe/grep.txt
+          while read -r c; do [ -z "$c" ] && continue; echo "## javap $c"; javap -public -cp "$CP" "$c" 2>&1 | grep -v '^Compiled from'; done < probe/javap.txt
+          echo "=====PROBE-END"
