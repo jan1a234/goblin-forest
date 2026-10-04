@@ -6,7 +6,7 @@ Das Spieldesign steht in [docs/DESIGN.md](docs/DESIGN.md).
 ## Installieren
 
 1. Die neueste `goblinforest-….jar` unter [Releases](https://github.com/jan1a234/goblin-forest/releases) herunterladen.
-   Das Release **dev** ist immer der neueste Stand von `main`, Releases mit `v` davor (z. B. `v0.1.0`) sind fertige Versionen.
+   Das Release **dev** ist immer der neueste Stand von `main`, Releases mit `v` davor (z. B. `v1.0.0`) sind fertige Versionen.
 2. Die Jar zusammen mit der passenden [Fabric API](https://modrinth.com/mod/fabric-api) (für 26.2) in den `mods`-Ordner legen,
    und zwar **auf dem Server und bei beiden Spielern**.
 3. Voraussetzungen: Minecraft Java 26.2, Fabric Loader 0.19.5 oder neuer, Java 25.
@@ -82,7 +82,7 @@ GitHub Actions baut bei jedem Push und Pull Request automatisch (`.github/workfl
 
 - Jeder Push auf `main` ersetzt das Vorab-Release **dev** durch die neue Jar.
 - Ein Git-Tag `v<Version>` erstellt ein richtiges Release, zum Beispiel:
-  `git tag v0.1.0 && git push origin v0.1.0`, oder auf GitHub unter *Releases → Draft a new release* einen neuen Tag `v0.1.0` anlegen.
+  `git tag v1.1.0 && git push origin v1.1.0`, oder auf GitHub unter *Releases → Draft a new release* einen neuen Tag wie `v1.1.0` anlegen.
 
 ## Aufbau des Codes
 
