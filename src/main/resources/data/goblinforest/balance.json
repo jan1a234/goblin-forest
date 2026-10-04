@@ -2,7 +2,10 @@
 	"match": {
 		"countdownSeconds": 10,
 		"endDelaySeconds": 15,
-		"maxUnitsPerTeam": 80
+		"maxUnitsPerTeam": 80,
+		"suddenDeathMinutes": 25,
+		"suddenDeathPercentPerSecond": 0.005,
+		"roundBreakSeconds": 20
 	},
 	"economy": {
 		"startGold": 150,
@@ -21,10 +24,14 @@
 		"reputationPerTowerKill": 1
 	},
 	"units": {
-		"slave":    { "cost": 40, "population": 1, "groupSize": 3, "health": 40,  "damage": 4,  "range": 0,  "speed": 0.25, "unlockReputation": 0, "attackCooldownTicks": 20, "aggroRange": 10 },
-		"warrior":  { "cost": 40, "population": 2, "groupSize": 1, "health": 110, "damage": 10, "range": 0,  "speed": 0.25, "unlockReputation": 0, "attackCooldownTicks": 22, "aggroRange": 10 },
-		"archer":   { "cost": 50, "population": 2, "groupSize": 1, "health": 60,  "damage": 9,  "range": 14, "speed": 0.25, "unlockReputation": 0, "attackCooldownTicks": 30, "aggroRange": 16 },
-		"assassin": { "cost": 80, "population": 3, "groupSize": 1, "health": 70,  "damage": 22, "range": 0,  "speed": 0.35, "unlockReputation": 1, "attackCooldownTicks": 24, "aggroRange": 14 }
+		"slave":     { "cost": 40,  "population": 1, "groupSize": 3, "health": 40,  "damage": 4,  "range": 0,  "speed": 0.25, "unlockReputation": 0, "attackCooldownTicks": 20,  "aggroRange": 10, "scale": 0.85 },
+		"warrior":   { "cost": 40,  "population": 2, "groupSize": 1, "health": 110, "damage": 10, "range": 0,  "speed": 0.25, "unlockReputation": 0, "attackCooldownTicks": 22,  "aggroRange": 10, "scale": 1.08 },
+		"archer":    { "cost": 50,  "population": 2, "groupSize": 1, "health": 60,  "damage": 9,  "range": 14, "speed": 0.25, "unlockReputation": 0, "attackCooldownTicks": 30,  "aggroRange": 16, "scale": 0.95 },
+		"assassin":  { "cost": 80,  "population": 3, "groupSize": 1, "health": 70,  "damage": 22, "range": 0,  "speed": 0.35, "unlockReputation": 1, "attackCooldownTicks": 24,  "aggroRange": 14, "scale": 0.92 },
+		"shaman":    { "cost": 90,  "population": 3, "groupSize": 1, "health": 60,  "damage": 6,  "range": 10, "speed": 0.22, "unlockReputation": 2, "attackCooldownTicks": 30,  "aggroRange": 14, "scale": 0.9 },
+		"wolfRider": { "cost": 110, "population": 4, "groupSize": 1, "health": 170, "damage": 16, "range": 0,  "speed": 0.38, "unlockReputation": 2, "attackCooldownTicks": 20,  "aggroRange": 14, "scale": 1.0 },
+		"troll":     { "cost": 150, "population": 5, "groupSize": 1, "health": 480, "damage": 26, "range": 0,  "speed": 0.2,  "unlockReputation": 3, "attackCooldownTicks": 32,  "aggroRange": 10, "scale": 1.55 },
+		"catapult":  { "cost": 200, "population": 5, "groupSize": 1, "health": 150, "damage": 60, "range": 22, "speed": 0.17, "unlockReputation": 4, "attackCooldownTicks": 100, "aggroRange": 0,  "scale": 1.0 }
 	},
 	"traits": {
 		"warriorFrontalBlock": 0.30,
@@ -32,7 +39,20 @@
 		"assassinOpeningStrikeMultiplier": 2.0,
 		"assassinStealthSeconds": 20,
 		"meleeReach": 2.2,
-		"retreatHealPercentPerSecond": 0.02
+		"retreatHealPercentPerSecond": 0.02,
+		"shamanHealAmount": 8,
+		"shamanHealRadius": 6,
+		"shamanHealIntervalTicks": 40,
+		"shamanHealTargets": 5,
+		"trollStructureMultiplier": 1.5,
+		"trollKnockback": 0.9,
+		"trollCleaveRadius": 2.0,
+		"trollCleaveShare": 0.5,
+		"wolfChargeMultiplier": 1.5,
+		"wolfChargeKnockback": 1.1,
+		"wolfChargeRechargeSeconds": 6,
+		"catapultSplashRadius": 3.0,
+		"catapultUnitDamageShare": 0.5
 	},
 	"unitLeveling": {
 		"xpPerKill": 10,
@@ -44,15 +64,31 @@
 			{ "title": "veteran",  "xpRequired": 60,  "healthBonus": 0.25, "damageBonus": 0.20, "speedBonus": 0.0 },
 			{ "title": "elite",    "xpRequired": 140, "healthBonus": 0.45, "damageBonus": 0.35, "speedBonus": 0.10 },
 			{ "title": "champion", "xpRequired": 300, "healthBonus": 0.70, "damageBonus": 0.50, "speedBonus": 0.10 }
-		]
+		],
+		"champion": {
+			"slaveExplosionDamage": 20,
+			"slaveExplosionRadius": 3,
+			"warriorAuraArmor": 0.10,
+			"warriorAuraRadius": 6,
+			"archerMultishotTargets": 3,
+			"assassinRestealthSeconds": 4,
+			"shamanHealMultiplier": 1.5,
+			"shamanRadiusBonus": 2,
+			"trollRegenPercentPerSecond": 0.01,
+			"catapultShots": 2
+		}
 	},
 	"upgrades": {
-		"armor":   { "costs": [100, 200, 350, 550, 800], "valuePerLevel": 0.08, "unlockReputation": [0, 0, 1, 2, 3] },
-		"attack":  { "costs": [100, 200, 350, 550, 800], "valuePerLevel": 0.10, "unlockReputation": [0, 0, 1, 2, 3] },
-		"range":   { "costs": [150, 300, 500],           "valuePerLevel": 2.0,  "unlockReputation": [0, 1, 2] },
-		"tower":   { "costs": [150, 300, 500],           "valuePerLevel": 5.0,  "unlockReputation": [0, 1, 2] },
-		"walls":   { "costs": [200, 400, 650],           "valuePerLevel": 500,  "unlockReputation": [0, 1, 2] },
-		"huts":    { "costs": [150, 300, 500],           "valuePerLevel": 10,   "unlockReputation": [0, 0, 1] }
+		"armor":     { "costs": [100, 200, 350, 550, 800], "valuePerLevel": 0.08, "unlockReputation": [0, 0, 1, 2, 3] },
+		"attack":    { "costs": [100, 200, 350, 550, 800], "valuePerLevel": 0.10, "unlockReputation": [0, 0, 1, 2, 3] },
+		"range":     { "costs": [150, 300, 500],           "valuePerLevel": 2.0,  "unlockReputation": [0, 1, 2] },
+		"training":  { "costs": [400, 900],                "valuePerLevel": 1,    "unlockReputation": [1, 3] },
+		"endurance": { "costs": [120, 250, 400],           "valuePerLevel": 0.10, "unlockReputation": [0, 1, 2] },
+		"tower":     { "costs": [150, 300, 500],           "valuePerLevel": 5.0,  "unlockReputation": [0, 1, 2] },
+		"walls":     { "costs": [200, 400, 650],           "valuePerLevel": 500,  "unlockReputation": [0, 1, 2] },
+		"huts":      { "costs": [150, 300, 500],           "valuePerLevel": 10,   "unlockReputation": [0, 0, 1] },
+		"cannon":    { "costs": [250, 200, 350, 500],      "valuePerLevel": 15,   "unlockReputation": [1, 2, 3, 4] },
+		"goldmine":  { "costs": [200, 400, 700],           "valuePerLevel": 1.0,  "unlockReputation": [0, 1, 2] }
 	},
 	"stronghold": {
 		"coreHealth": 3000,
@@ -61,7 +97,12 @@
 		"towerRange": 24,
 		"towerShotsPerSecond": 1.0,
 		"towerRangePerLevel": 2.0,
-		"structureAttackReach": 3.5
+		"structureAttackReach": 3.5,
+		"cannonDamage": 40,
+		"cannonRadius": 3,
+		"cannonRange": 22,
+		"cannonReloadSeconds": 4.0,
+		"cannonReloadPerLevel": 0.5
 	},
 	"hero": {
 		"baseHealth": 200,
@@ -75,11 +116,23 @@
 		"xpForLevel": [0, 60, 150, 280, 450, 670, 950, 1300, 1720, 2220]
 	},
 	"abilities": {
-		"bloodlust":  { "cooldownSeconds": 30, "radius": 12, "durationSeconds": 8, "amount": 0.30 },
-		"battleSlam": { "cooldownSeconds": 15, "radius": 5,  "durationSeconds": 0, "amount": 30 }
+		"bloodlust":  { "cooldownSeconds": 30, "radius": 12, "durationSeconds": 8,  "amount": 0.30, "maxRank": 3, "amountPerRank": 0.10, "radiusPerRank": 2,   "durationPerRank": 2, "cooldownPerRank": 2 },
+		"battleSlam": { "cooldownSeconds": 15, "radius": 5,  "durationSeconds": 0,  "amount": 30,   "maxRank": 3, "amountPerRank": 12,   "radiusPerRank": 0.5, "durationPerRank": 0, "cooldownPerRank": 1 },
+		"rage":       { "cooldownSeconds": 0,  "radius": 0,  "durationSeconds": 10, "amount": 0.6,  "maxRank": 3, "amountPerRank": 0.1,   "radiusPerRank": 0,   "durationPerRank": 2, "cooldownPerRank": 0 }
+	},
+	"rage": {
+		"maxCharge": 100,
+		"chargePerDamageDealt": 0.5,
+		"chargePerDamageTaken": 0.6,
+		"speedBonus": 0.30,
+		"lifesteal": 0.20,
+		"lifestealPerRank": 0.05
 	},
 	"spells": {
-		"fireball": { "cost": 60, "cooldownSeconds": 12, "unlockReputation": 0, "radius": 3, "amount": 50, "range": 40, "upgradeCosts": [150, 300], "upgradeReputation": [1, 3], "bonusPerLevel": 0.5 },
-		"healing":  { "cost": 80, "cooldownSeconds": 25, "unlockReputation": 1, "radius": 6, "amount": 60, "range": 40, "upgradeCosts": [175, 350], "upgradeReputation": [2, 4], "bonusPerLevel": 0.5 }
+		"fireball":  { "cost": 60,  "cooldownSeconds": 12, "unlockReputation": 0, "radius": 3, "amount": 50,  "range": 40, "upgradeCosts": [150, 300], "upgradeReputation": [1, 3], "bonusPerLevel": 0.5,  "count": 0 },
+		"healing":   { "cost": 80,  "cooldownSeconds": 25, "unlockReputation": 1, "radius": 6, "amount": 60,  "range": 40, "upgradeCosts": [175, 350], "upgradeReputation": [2, 4], "bonusPerLevel": 0.5,  "count": 0 },
+		"roots":     { "cost": 90,  "cooldownSeconds": 30, "unlockReputation": 2, "radius": 5, "amount": 4,   "range": 40, "upgradeCosts": [200, 350], "upgradeReputation": [3, 4], "bonusPerLevel": 0.25, "count": 0 },
+		"lightning": { "cost": 150, "cooldownSeconds": 45, "unlockReputation": 3, "radius": 8, "amount": 45,  "range": 40, "upgradeCosts": [250, 450], "upgradeReputation": [4, 5], "bonusPerLevel": 0.33, "count": 5 },
+		"meteor":    { "cost": 300, "cooldownSeconds": 90, "unlockReputation": 5, "radius": 5, "amount": 300, "range": 40, "upgradeCosts": [400, 700], "upgradeReputation": [5, 5], "bonusPerLevel": 0.25, "count": 0 }
 	}
 }

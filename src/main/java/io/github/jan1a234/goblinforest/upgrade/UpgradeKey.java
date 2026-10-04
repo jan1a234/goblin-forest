@@ -15,6 +15,7 @@ public record UpgradeKey(UpgradeType type, UnitType unit) {
 		}
 	}
 
+	/** Upgrade ohne Einheitentyp (Festung oder ganze Armee). */
 	public static UpgradeKey stronghold(UpgradeType type) {
 		return new UpgradeKey(type, null);
 	}
@@ -54,9 +55,11 @@ public record UpgradeKey(UpgradeType type, UnitType unit) {
 				keys.add(unit(UpgradeType.RANGE, unit));
 			}
 		}
-		keys.add(stronghold(UpgradeType.TOWER));
-		keys.add(stronghold(UpgradeType.WALLS));
-		keys.add(stronghold(UpgradeType.HUTS));
+		for (UpgradeType type : UpgradeType.values()) {
+			if (!type.perUnitType()) {
+				keys.add(stronghold(type));
+			}
+		}
 		return keys;
 	}
 }

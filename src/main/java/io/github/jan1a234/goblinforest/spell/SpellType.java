@@ -5,7 +5,13 @@ public enum SpellType {
 	/** Flächenschaden an der anvisierten Stelle. */
 	FIREBALL("fireball"),
 	/** Heilt eigene Einheiten (und den Häuptling) an der anvisierten Stelle. */
-	HEALING("healing");
+	HEALING("healing"),
+	/** Wurzeln halten Gegner im Umkreis fest. */
+	ROOTS("roots"),
+	/** Blitze schlagen in zufällige Gegner im Umkreis ein. */
+	LIGHTNING("lightning"),
+	/** Ein Meteor zerschmettert alles im Umkreis, auch Gebäude. */
+	METEOR("meteor");
 
 	private final String id;
 
@@ -19,6 +25,11 @@ public enum SpellType {
 
 	public String translationKey() {
 		return "spell.goblinforest." + id;
+	}
+
+	/** Wirkt der Zauber auf Gegner (true) oder auf Verbündete (Heilung)? */
+	public boolean offensive() {
+		return this != HEALING;
 	}
 
 	public static SpellType byId(String id) {

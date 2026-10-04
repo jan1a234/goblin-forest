@@ -25,23 +25,28 @@ import net.minecraft.world.item.component.ItemLore;
 public final class HeroKit {
 	public static final String TAG = "goblinforest_kit";
 
+	/** Hotbar-Platz: Rechtsklick löst {@link #action()} aus (gleiche Aktionen wie die Tasten und das Kriegsmenü). */
 	public enum Slot {
-		AXE("axe", 0, Items.IRON_AXE),
-		FIREBALL("fireball", 1, Items.FIRE_CHARGE),
-		HEALING("healing", 2, Items.RED_MUSHROOM),
-		BLOODLUST("bloodlust", 3, Items.BLAZE_POWDER),
-		BATTLE_SLAM("battleSlam", 4, Items.HEAVY_CORE),
-		RALLY("rally", 5, Items.GOAT_HORN),
-		MENU("menu", 8, Items.COMPASS);
+		AXE("axe", 0, Items.IRON_AXE, ""),
+		FIREBALL("fireball", 1, Items.FIRE_CHARGE, "cast:fireball"),
+		HEALING("healing", 2, Items.RED_MUSHROOM, "cast:healing"),
+		ROOTS("roots", 3, Items.HANGING_ROOTS, "cast:roots"),
+		LIGHTNING("lightning", 4, Items.LIGHTNING_ROD, "cast:lightning"),
+		METEOR("meteor", 5, Items.MAGMA_BLOCK, "cast:meteor"),
+		BLOODLUST("bloodlust", 6, Items.BLAZE_POWDER, "ability:bloodlust"),
+		BATTLE_SLAM("battleSlam", 7, Items.HEAVY_CORE, "ability:battleSlam"),
+		RAGE("rage", 8, Items.MAGMA_CREAM, "ability:rage");
 
 		private final String id;
 		private final int hotbarSlot;
 		private final Item item;
+		private final String action;
 
-		Slot(String id, int hotbarSlot, Item item) {
+		Slot(String id, int hotbarSlot, Item item, String action) {
 			this.id = id;
 			this.hotbarSlot = hotbarSlot;
 			this.item = item;
+			this.action = action;
 		}
 
 		public String id() {
@@ -56,6 +61,11 @@ public final class HeroKit {
 			return item;
 		}
 
+		/** Aktion für {@code Match.handleAction}, leer für die Axt. */
+		public String action() {
+			return action;
+		}
+
 		public static Slot byId(String id) {
 			for (Slot slot : values()) {
 				if (slot.id.equals(id)) {
@@ -63,6 +73,11 @@ public final class HeroKit {
 				}
 			}
 			return null;
+		}
+
+		/** Hotbar-Platz für einen Zauber oder eine Fähigkeit (gleiche ID). */
+		public static Slot forAction(String id) {
+			return byId(id);
 		}
 	}
 

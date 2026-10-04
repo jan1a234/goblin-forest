@@ -42,6 +42,52 @@ public final class UnitCombat {
 		return leveling.scaledSpeed(balance.unit(type).speed(), level);
 	}
 
+	/** Bewegungstempo mit Veteranenbonus und dem Tempofaktor der Armee (Ausdauer-Upgrade). */
+	public double speed(UnitType type, int level, double armyMultiplier) {
+		return speed(type, level) * Math.max(0.1, armyMultiplier);
+	}
+
+	/** Schadensfaktor gegen Gebäude: Trolle reißen Mauern ein. */
+	public double structureMultiplier(UnitType type) {
+		return type == UnitType.TROLL ? balance.traits().trollStructureMultiplier() : 1.0;
+	}
+
+	/** Ist das Level ein Champion (höchste Veteranenstufe) mit Spezialfähigkeit? */
+	public boolean isChampion(int level) {
+		return level >= leveling.maxLevel();
+	}
+
+	/**
+	 * Heilung eines Schamanen pro Puls: Grundwert mit Veteranen- und Angriffsbonus, Champions heilen mehr.
+	 */
+	public double shamanHeal(int level, int attackUpgrade) {
+		double heal = balance.traits().shamanHealAmount() * (1.0 + leveling.step(level).damageBonus())
+				* (1.0 + balance.upgrade("attack").valuePerLevel() * attackUpgrade);
+		return isChampion(level) ? heal * balance.unitLeveling().champion().shamanHealMultiplier() : heal;
+	}
+
+	public double shamanHealRadius(int level) {
+		double radius = balance.traits().shamanHealRadius();
+		return isChampion(level) ? radius + balance.unitLeveling().champion().shamanRadiusBonus() : radius;
+	}
+
+	/** Schaden eines Katapult-Einschlags an Einheiten im Umkreis (Anteil des Gebäudeschadens). */
+	public double catapultSplashDamage(double damage) {
+		return damage * balance.traits().catapultUnitDamageShare();
+	}
+
+	/** Schaden der Festungskanone für eine Kanonenstufe (1 = gerade gebaut). */
+	public double cannonDamage(int cannonLevel) {
+		return balance.stronghold().cannonDamage() + balance.upgrade("cannon").valuePerLevel() * Math.max(0, cannonLevel - 1);
+	}
+
+	/** Ticks zwischen zwei Kanonenschüssen für eine Kanonenstufe. */
+	public int cannonReloadTicks(int cannonLevel) {
+		Balance.Stronghold stronghold = balance.stronghold();
+		double seconds = stronghold.cannonReloadSeconds() - stronghold.cannonReloadPerLevel() * Math.max(0, cannonLevel - 1);
+		return Math.max(10, (int) Math.round(seconds * 20));
+	}
+
 	/** Angriffsreichweite in Blöcken: Fernkampf mit Reichweiten-Upgrade, sonst die Nahkampfreichweite. */
 	public double attackRange(UnitType type, int rangeUpgrade) {
 		Balance.UnitStats stats = balance.unit(type);
@@ -51,14 +97,22 @@ public final class UnitCombat {
 		return stats.range() + balance.upgrade("range").valuePerLevel() * rangeUpgrade;
 	}
 
-	/** Ticks zwischen zwei Angriffen; Blutrausch verkürzt die Pause. */
-	public int attackCooldownTicks(UnitType type, boolean bloodlust) {
-		int base = balance.unit(type).attackCooldownTicks();
-		if (!bloodlust) {
+	/** Ticks zwischen zwei Angriffen ohne Blutrausch. */
+	public int attackCooldownTicks(UnitType type) {
+		return balance.unit(type).attackCooldownTicks();
+	}
+
+	/**
+	 * Ticks zwischen zwei Angriffen; Blutrausch verkürzt die Pause um den Bonus des Rangs, mit dem er gewirkt wurde.
+	 *
+	 * @param bloodlustBonus Angriffstempo-Bonus (0.3 = +30 %) oder 0 ohne Blutrausch
+	 */
+	public int attackCooldownTicks(UnitType type, double bloodlustBonus) {
+		int base = attackCooldownTicks(type);
+		if (bloodlustBonus <= 0) {
 			return base;
 		}
-		double bonus = balance.ability("bloodlust").amount();
-		return Math.max(1, (int) Math.round(base / (1.0 + bonus)));
+		return Math.max(1, (int) Math.round(base / (1.0 + bloodlustBonus)));
 	}
 
 	/**

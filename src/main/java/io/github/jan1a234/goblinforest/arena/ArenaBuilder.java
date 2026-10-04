@@ -136,6 +136,12 @@ public final class ArenaBuilder {
 	private static BlockState resolve(Material material, TeamColor side) {
 		return switch (material) {
 			case AIR -> Blocks.AIR.defaultBlockState();
+			case GOLD_ORE -> Blocks.GOLD_ORE.defaultBlockState();
+			case RAW_GOLD_BLOCK -> Blocks.RAW_GOLD_BLOCK.defaultBlockState();
+			case RAIL -> Blocks.RAIL.defaultBlockState();
+			case CHAIN -> Blocks.IRON_CHAIN.defaultBlockState();
+			case DISPENSER -> Blocks.DISPENSER.defaultBlockState().setValue(net.minecraft.world.level.block.DispenserBlock.FACING,
+					side == TeamColor.RED ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.WEST);
 			case BARRIER -> Blocks.BARRIER.defaultBlockState();
 			case BEDROCK -> Blocks.BEDROCK.defaultBlockState();
 			case STONE -> Blocks.STONE.defaultBlockState();
