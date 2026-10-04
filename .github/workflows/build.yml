@@ -45,6 +45,8 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew build -Pmod_version="${{ steps.version.outputs.version }}"
+      - name: Match-Test auf echtem Server (Gametest)
+        run: ./gradlew runGameTest -Pmod_version="${{ steps.version.outputs.version }}"
       - name: Build-Ergebnis hochladen
         uses: actions/upload-artifact@v7
         with:

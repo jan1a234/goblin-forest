@@ -270,6 +270,19 @@ public final class MatchManager {
 		return Result.ok(Component.translatable("command.goblinforest.starting", assignment.size()));
 	}
 
+	/**
+	 * Startet ein Übungsmatch ganz ohne Spieler (nur für automatische Tests): Einheiten werden per
+	 * {@link Match#recruitForTest} gekauft und kämpfen alleine.
+	 */
+	public static Match startWithoutPlayers(MinecraftServer s) {
+		if (match != null) {
+			match.finish(null);
+		}
+		server = s;
+		match = new Match(s, s.getLevel(ARENA), Map.of(), Map.of(), true);
+		return match;
+	}
+
 	public static Result stop(Component by) {
 		if (match == null) {
 			return Result.fail("command.goblinforest.no_match");
