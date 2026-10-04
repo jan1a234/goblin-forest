@@ -1,2 +1,5 @@
-javap net.minecraft.world.level.block.ColorCollection
-javap net.minecraft.world.entity.Entity (push|addDeltaMovement|setDeltaMovement)
+sh J=$(find $HOME/.gradle -name 'fabric-loom*.jar' | grep -v sources | head -1); echo $J; unzip -Z1 $J | grep -i gametest; for c in $(unzip -Z1 $J | grep -i 'GameTestSettings\|FabricApiExtension' | grep class$ | sed 's/\.class$//;s#/#.#g'); do javap -cp $J $c; done
+sh J=$(find $HOME/.gradle -name 'fabric-gametest-api-v1*.jar' | grep -v sources | head -1); echo $J; unzip -Z1 $J | grep -v '^META\|mixin' | head -40; unzip -p $J fabric.mod.json
+javap net.fabricmc.fabric.api.gametest.v1.GameTest
+javap net.minecraft.gametest.framework.GameTestHelper (public .*(getLevel|succeed|fail|assertTrue|runAfterDelay|succeedWhen|onEachTick|getTick|absolute|startSequence|killAllEntities|spawn)\()
+grep ^net/fabricmc/fabric/api/gametest/
