@@ -1,3 +1,4 @@
-javap net.minecraft.client.MouseHandler
-src net.minecraft.client.MouseHandler onScroll|ScrollWheel|scroll|setSelectedSlot|isSpectator
-grep fabric/api/client/event/lifecycle|fabric/api/client/input|Scroll
+javap net.fabricmc.fabric.api.event.client.player.ClientHotbarScrollEvents
+javap net.fabricmc.fabric.api.event.client.player.ClientHotbarScrollEvents$Allow
+javap net.fabricmc.fabric.api.event.client.player.ClientHotbarScrollEvents$Before
+sh sed -n 185,225p src-x/net/minecraft/client/MouseHandler.java
