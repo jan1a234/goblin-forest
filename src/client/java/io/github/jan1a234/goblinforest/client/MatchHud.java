@@ -12,6 +12,7 @@ import io.github.jan1a234.goblinforest.net.MatchStatePayload;
 import io.github.jan1a234.goblinforest.unit.UnitType;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Options;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
@@ -55,6 +56,9 @@ public final class MatchHud {
 		drawNotices(g, font, s);
 		if (CommandView.active()) {
 			drawCommandView(g, font);
+		} else if (s.respawnSeconds() <= 0 && (phase == MatchPhase.COUNTDOWN || phase == MatchPhase.BATTLE)
+				&& ClientMatchState.stillInFortress()) {
+			drawLeaveFortressHint(g, font);
 		}
 		if (s.respawnSeconds() > 0) {
 			Component text = Component.translatable("hud.goblinforest.respawn", s.respawnSeconds());
@@ -225,7 +229,24 @@ public final class MatchHud {
 		}
 	}
 
-	/** Hinweise in der Bildschirmmitte oben: Sudden Death, Best-of-Stand, freie Fähigkeitspunkte. */
+	/**
+	 * Wegweiser zu Beginn jeder Runde, bis der Häuptling die eigene Festung verlassen hat:
+	 * Der Spieler ist selbst der Häuptling und läuft mit den Bewegungstasten durchs Tor.
+	 */
+	private static void drawLeaveFortressHint(GuiGraphicsExtractor g, Font font) {
+		Options options = mc().options;
+		String keys = String.join("/", options.keyUp.getTranslatedKeyMessage().getString(), options.keyLeft.getTranslatedKeyMessage().getString(),
+				options.keyDown.getTranslatedKeyMessage().getString(), options.keyRight.getTranslatedKeyMessage().getString());
+		Component title = Component.translatable("hud.goblinforest.leave_fortress.title");
+		Component text = Component.translatable("hud.goblinforest.leave_fortress", keys);
+		int cx = g.guiWidth() / 2;
+		int y = g.guiHeight() / 2 + 22;
+		int w = Math.min(g.guiWidth() - 8, Math.max(font.width(title), font.width(text)) + 12);
+		panel(g, cx - w / 2, y - 4, w, 26);
+		g.centeredText(font, title, cx, y, GOLD);
+		g.centeredText(font, text, cx, y + 11, TEXT);
+	}
+
 	/** Fadenkreuz in der Bildmitte (dort landen Zauber und Sammelpunkt) und eine kurze Bedienhilfe. */
 	private static void drawCommandView(GuiGraphicsExtractor g, Font font) {
 		int cx = g.guiWidth() / 2;
@@ -238,6 +259,7 @@ public final class MatchHud {
 		g.centeredText(font, Component.translatable("hud.goblinforest.command_view", ModKeys.COMMAND_VIEW.getTranslatedKeyMessage()), cx, cy + 12, GOLD);
 	}
 
+	/** Hinweise in der Bildschirmmitte oben: Sudden Death, Best-of-Stand, freie Fähigkeitspunkte. */
 	private static void drawNotices(GuiGraphicsExtractor g, Font font, MatchStatePayload s) {
 		int cx = g.guiWidth() / 2;
 		int y = TOP_BAR_HEIGHT + 4;

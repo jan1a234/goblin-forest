@@ -44,6 +44,9 @@ public class ClientMatchGameTest implements FabricClientGameTest {
 			});
 			context.waitFor(client -> ClientMatchState.get().inMatch() && ClientMatchState.get().phase() == MatchPhase.BATTLE.ordinal(), 20 * 180);
 			context.waitTicks(30);
+			if (!context.computeOnClient(client -> ClientMatchState.stillInFortress())) {
+				throw new AssertionError("Zu Beginn der Schlacht sollte der Hinweis zum Verlassen der Festung erscheinen");
+			}
 			context.takeScreenshot("goblinforest-01-schlacht");
 
 			// Eine gemischte Armee direkt vor dem Häuptling, damit Modelle, Warg und Katapult-Karren im Bild sind.
@@ -65,6 +68,9 @@ public class ClientMatchGameTest implements FabricClientGameTest {
 						Vec3.ZERO, 90.0F, 12.0F, TeleportTransition.DO_NOTHING));
 			});
 			context.waitTicks(40);
+			if (context.computeOnClient(client -> ClientMatchState.stillInFortress())) {
+				throw new AssertionError("Vor dem Tor sollte der Hinweis zum Verlassen der Festung verschwinden");
+			}
 			context.takeScreenshot("goblinforest-02-armee");
 			context.waitTicks(40);
 			context.takeScreenshot("goblinforest-02-armee-naeher");

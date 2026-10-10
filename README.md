@@ -21,6 +21,10 @@ Test im Spiel: `/gf` zeigt die installierte Version.
    auch wenn jemand zwischendurch rausfliegt oder der Server neu startet.
 3. Ziel: den **Festungskern** des anderen Clans zerstören. Wer seinen Kern verliert, verliert das Match.
 
+**Du bist selbst der Häuptling.** Es gibt keinen Helden, den man losschicken muss: Nach dem Countdown läufst du mit
+W/A/S/D aus dem Hof deiner Festung durch das offene Tor auf die Lane und kämpfst dort an der Seite deiner Goblins.
+Bis du die Festung verlassen hast, zeigt das HUD den Weg hinaus.
+
 Alleine ausprobieren: `/gf start practice` (der zweite Clan bleibt leer).
 
 **Gegen die KI:** `/gf start ki` (oder `ki leicht`, `ki normal`, `ki schwer`). Die KI führt einen eigenen Clan, rekrutiert eine
@@ -37,6 +41,7 @@ Die Kamera steht im Match fest in der Verfolgerperspektive, ihr Abstand lässt s
 
 | Taste | Wirkung |
 |---|---|
+| **W/A/S/D** | Häuptling bewegen: durchs Tor aufs Schlachtfeld und zurück (in der Kommandoansicht schwenkt es stattdessen die Kamera) |
 | **B** | Kriegsmenü: Einheiten, Upgrades, Festung, Zauber, Häuptling |
 | **Z / X / C / V** | Sklaven / Krieger / Bogenschütze / Assassine rekrutieren |
 | **U / I / O / M** | Schamane / Wolfsreiter / Troll / Katapult rekrutieren (ab Ruf 2, 3, 4) |

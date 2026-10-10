@@ -69,7 +69,7 @@ public class GoblinForestClient implements ClientModInitializer {
 	}
 
 	private static void tick(Minecraft client) {
-		ClientMatchState.tick();
+		ClientMatchState.tick(client);
 		WarDrums.tick(client);
 		CommandView.tick(client);
 		boolean active = ClientMatchState.active() && client.player != null;
