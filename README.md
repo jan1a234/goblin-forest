@@ -24,6 +24,7 @@ Test im Spiel: `/gf` zeigt die installierte Version.
 **Du bist selbst der Häuptling.** Es gibt keinen Helden, den man losschicken muss: Nach dem Countdown läufst du mit
 W/A/S/D aus dem Hof deiner Festung durch das offene Tor auf die Lane und kämpfst dort an der Seite deiner Goblins.
 Bis du die Festung verlassen hast, zeigt das HUD den Weg hinaus.
+Für den Überblick schaltest du mit der **linken Alt-Taste** auf die Draufsicht (Kommandoansicht) und wieder zurück.
 
 Alleine ausprobieren: `/gf start practice` (der zweite Clan bleibt leer).
 
