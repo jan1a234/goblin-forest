@@ -222,7 +222,11 @@ public final class TeamState {
 		return upgrades.getOrDefault(key, 0);
 	}
 
+	/** Stufe eines Einheiten-Upgrades; der Häuptling wird nicht über Upgrades verbessert, sondern über sein Level (0). */
 	public int unitUpgrade(UpgradeType type, UnitType unit) {
+		if (!unit.soldier()) {
+			return 0;
+		}
 		return level(UpgradeKey.unit(type, unit));
 	}
 
