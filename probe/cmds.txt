@@ -1,9 +1,3 @@
-grep fabric/api/client/gametest/v1/
-javap net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest
-javap net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
-javap net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext
-javap net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldBuilder
-javap net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext
-javap net.fabricmc.fabric.api.client.gametest.v1.context.TestClientLevelContext
-javap net.fabricmc.fabric.api.client.gametest.v1.TestInput
-javap net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions
+javap net.minecraft.client.MouseHandler
+src net.minecraft.client.MouseHandler onScroll|ScrollWheel|scroll|setSelectedSlot|isSpectator
+grep fabric/api/client/event/lifecycle|fabric/api/client/input|Scroll
