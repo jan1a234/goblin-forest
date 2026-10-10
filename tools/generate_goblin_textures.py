@@ -30,6 +30,8 @@ ROBE = (62, 40, 70)
 TROLL = (96, 128, 108)
 TROLL_DARK = (70, 98, 80)
 GOGGLE = (120, 200, 230)
+GOLD = (232, 186, 52)
+GOLD_DARK = (168, 124, 28)
 
 TEAMS = {
     "red": ((176, 40, 32), (120, 24, 20), (226, 90, 70)),
@@ -145,6 +147,24 @@ def head(img, rng, unit, team):
         fill(img, (fx, fy + 3, fx + 10, fy + 4), LEATHER_DARK, 0, rng)
         for ex in (fx + 2, fx + 6):
             fill(img, (ex, fy + 3, ex + 2, fy + 4), GOGGLE, 0, rng)
+    elif unit == "chieftain":
+        # Goldkrone mit Zacken, Kriegsbemalung in Clanfarbe, Federbusch hinten
+        faces = box_faces(0, 0, 10, 8, 8)
+        fill(img, top, dark, 6, rng)
+        for name in ("right", "left", "back"):
+            r = faces[name]
+            fill(img, (r[0], r[1], r[2], r[1] + 2), GOLD, 10, rng)
+            for x in range(r[0], r[2], 2):
+                img.putpixel((x, r[1]), GOLD_DARK + (255,))
+        fill(img, (fx, fy, fx + 10, fy + 2), GOLD, 10, rng)
+        for x in range(fx, fx + 10, 3):
+            img.putpixel((x, fy), (200, 40, 40, 255))
+        fill(img, (faces["back"][0] + 3, faces["back"][1] + 2, faces["back"][0] + 7, faces["back"][1] + 6), main, 6, rng)
+        for ex in (fx + 2, fx + 6):
+            img.putpixel((ex, fy + 4), main + (255,))
+            img.putpixel((ex + 1, fy + 4), main + (255,))
+        img.putpixel((fx + 4, fy + 5), light + (255,))
+        img.putpixel((fx + 5, fy + 5), light + (255,))
     else:
         fill(img, top, (60, 70, 30), 10, rng)
     # Nase 4x4x1 bei (31,1)
@@ -206,6 +226,24 @@ def body(img, rng, unit, team):
         for i in range(4):
             img.putpixel((f[0] + 2 + i, f[1] + 2 + i), (150, 90, 80, 255))
             img.putpixel((f[0] + 5 - i // 2, f[1] + 4 + i), TROLL_DARK + (255,))
+    elif unit == "chieftain":
+        # Brustpanzer mit Goldbeschlägen, Umhang in Clanfarbe, breiter Gürtel mit Schnalle
+        paint_box(img, 16, 16, 8, 12, 4, METAL_DARK, 10, rng)
+        faces = box_faces(16, 16, 8, 12, 4)
+        for name, rect in faces.items():
+            if name in ("top", "bottom"):
+                continue
+            x0, y0, x1, y1 = rect
+            fill(img, (x0, y0 + 8, x1, y0 + 10), LEATHER_DARK, 4, rng)
+            fill(img, (x0, y1 - 2, x1, y1), main, 6, rng)
+        fill(img, faces["back"], main, 8, rng)
+        fill(img, faces["top"], main, 6, rng)
+        f = faces["front"]
+        fill(img, (f[0] + 1, f[1] + 1, f[2] - 1, f[1] + 7), METAL, 12, rng)
+        for x in range(f[0] + 1, f[2] - 1):
+            img.putpixel((x, f[1] + 1), GOLD + (255,))
+        fill(img, (f[0] + 3, f[1] + 3, f[0] + 5, f[1] + 5), GOLD, 0, rng)
+        fill(img, (f[0] + 3, f[1] + 8, f[0] + 5, f[1] + 10), GOLD, 0, rng)
     else:
         paint_box(img, 16, 16, 8, 12, 4, main, 10, rng)
         for name, rect in box_faces(16, 16, 8, 12, 4).items():
@@ -266,6 +304,18 @@ def body(img, rng, unit, team):
                 if name != "top":
                     fill(img, (x0, y1 - 5, x1, y1 - 1), LEATHER, 8, rng)
                     fill(img, (x0, y1 - 3, x1, y1 - 2), main, 0, rng)
+        elif unit == "chieftain":
+            paint_box(img, u, v, 4, 12, 4, SKIN, 8, rng)
+            for name, rect in box_faces(u, v, 4, 12, 4).items():
+                if name == "bottom":
+                    continue
+                if name == "top":
+                    fill(img, rect, METAL, 10, rng)
+                    continue
+                x0, y0, x1, y1 = rect
+                fill(img, (x0, y0, x1, y0 + 4), METAL, 10, rng)
+                fill(img, (x0, y0 + 4, x1, y0 + 5), GOLD_DARK, 0, rng)
+                fill(img, (x0, y1 - 5, x1, y1 - 1), GOLD, 8, rng)
         elif unit in ("warrior", "archer", "catapult"):
             paint_box(img, u, v, 4, 12, 4, SKIN, 8, rng)
             for name, rect in box_faces(u, v, 4, 12, 4).items():
@@ -305,7 +355,7 @@ def make(unit, team):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    for unit in ("slave", "warrior", "archer", "assassin", "shaman", "wolfRider", "troll", "catapult"):
+    for unit in ("slave", "warrior", "archer", "assassin", "shaman", "wolfRider", "troll", "catapult", "chieftain"):
         for team in TEAMS:
             path = os.path.join(OUT, f"{unit.lower()}_{team}.png")
             make(unit, team).save(path)

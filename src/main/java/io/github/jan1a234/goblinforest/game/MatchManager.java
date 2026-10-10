@@ -9,12 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.ChatFormatting;
@@ -25,7 +23,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
@@ -70,11 +67,6 @@ public final class MatchManager {
 			}
 			return true;
 		});
-		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamage, damageTaken, blocked) -> {
-			if (match != null && entity instanceof ServerPlayer player && match.isMember(player.getUUID())) {
-				match.onHeroDamaged(player, source, damageTaken);
-			}
-		});
 		ServerLivingEntityEvents.ALLOW_DEATH.register((entity, source, amount) -> {
 			if (match != null && entity instanceof ServerPlayer player && match.isMember(player.getUUID())) {
 				return match.onHeroDeath(player, source);
@@ -82,43 +74,11 @@ public final class MatchManager {
 			return true;
 		});
 
-		UseItemCallback.EVENT.register((player, level, hand) -> {
-			String kit = HeroKit.kitId(player.getItemInHand(hand));
-			if (kit == null || HeroKit.Slot.AXE.id().equals(kit) || "armor".equals(kit)) {
-				return InteractionResult.PASS;
-			}
-			if (level.isClientSide()) {
-				// Der Client meldet die Benutzung genau einmal an den Server; Vanilla-Verhalten (Feuer, Horn) bleibt aus.
-				return InteractionResult.SUCCESS;
-			}
-			if (match != null && player instanceof ServerPlayer serverPlayer && match.handleKitUse(serverPlayer, kit)) {
-				return InteractionResult.SUCCESS;
-			}
-			return InteractionResult.FAIL;
-		});
 		UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
-			if (!isInArena(level) || player.isCreative()) {
-				return InteractionResult.PASS;
-			}
-			String kit = HeroKit.kitId(player.getItemInHand(hand));
-			if (kit != null && !HeroKit.Slot.AXE.id().equals(kit) && !"armor".equals(kit)) {
-				if (level.isClientSide()) {
-					return InteractionResult.SUCCESS;
-				}
-				if (match != null && player instanceof ServerPlayer serverPlayer) {
-					match.handleKitUse(serverPlayer, kit);
-				}
-				return InteractionResult.SUCCESS;
-			}
 			// Türen, Truhen und Co. in der Arena sind Kulisse.
-			return InteractionResult.FAIL;
+			return !isInArena(level) || player.isCreative() ? InteractionResult.PASS : InteractionResult.FAIL;
 		});
 		PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) -> !isInArena(level) || player.isCreative());
-		ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> {
-			if (entity instanceof ItemEntity item && HeroKit.kitId(item.getItem()) != null) {
-				item.discard();
-			}
-		});
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, s) -> onJoin(handler.player));
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, s) -> LOBBY.remove(handler.player.getUUID()));
@@ -221,16 +181,17 @@ public final class MatchManager {
 	 * (Übungsmodus zum Ausprobieren alleine, ohne Aufgabe-Regel).
 	 */
 	public static Result start(MinecraftServer s, ServerPlayer starter, boolean practice) {
-		return start(s, starter, practice, null, 1);
+		return start(s, starter, practice, null, 1, false);
 	}
 
 	/**
 	 * Startet ein Match mit allen angemeldeten Spielern.
 	 *
 	 * @param ai     Schwierigkeit eines KI-Gegners oder null; mit KI spielen alle Angemeldeten in einem Clan
-	 * @param bestOf Anzahl der Runden einer Serie (1, 3 oder 5)
+	 * @param bestOf      Anzahl der Runden einer Serie (1, 3 oder 5)
+	 * @param suddenDeath Sudden Death einschalten (sonst kein Zeitlimit)
 	 */
-	public static Result start(MinecraftServer s, ServerPlayer starter, boolean practice, AiDifficulty ai, int bestOf) {
+	public static Result start(MinecraftServer s, ServerPlayer starter, boolean practice, AiDifficulty ai, int bestOf, boolean suddenDeath) {
 		if (match != null) {
 			return Result.fail("command.goblinforest.match_running");
 		}
@@ -291,7 +252,7 @@ public final class MatchManager {
 		}
 		LOBBY.clear();
 		Series series = bestOf > 1 ? new Series(bestOf) : null;
-		match = new Match(s, arena, assignment, names, new MatchOptions(practice || ai == null && (red == 0 || green == 0), ai, series));
+		match = new Match(s, arena, assignment, names, new MatchOptions(practice || ai == null && (red == 0 || green == 0), ai, series, suddenDeath));
 		for (Map.Entry<UUID, TeamColor> entry : assignment.entrySet()) {
 			ServerPlayer player = s.getPlayerList().getPlayer(entry.getKey());
 			if (player != null) {

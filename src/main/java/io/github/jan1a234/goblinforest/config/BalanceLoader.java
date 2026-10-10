@@ -52,7 +52,11 @@ public final class BalanceLoader {
 		}
 		for (UnitType type : UnitType.values()) {
 			Balance.UnitStats stats = balance.unit(type);
-			require(stats.groupSize() >= 1 && stats.cost() > 0 && stats.health() > 0, "Einheit " + type.id() + " hat ungültige Werte");
+			if (type.soldier()) {
+				require(stats.groupSize() >= 1 && stats.cost() > 0 && stats.health() > 0, "Einheit " + type.id() + " hat ungültige Werte");
+			} else {
+				require(stats.groupSize() == 1 && stats.speed() > 0, "Der Häuptling braucht groupSize 1 und ein Tempo");
+			}
 			require(stats.attackCooldownTicks() > 0, "Einheit " + type.id() + " braucht attackCooldownTicks > 0");
 			require(stats.scale() > 0.2 && stats.scale() <= 3.0, "Einheit " + type.id() + " braucht eine Größe zwischen 0.2 und 3");
 		}

@@ -3,13 +3,13 @@ package io.github.jan1a234.goblinforest.game;
 import java.util.Locale;
 
 /**
- * Schwierigkeit des KI-Clans. Die KI hat keinen Häuptling auf dem Feld; dafür bekommt sie je nach Stufe
- * mehr oder weniger passives Gold und entscheidet schneller und klüger.
+ * Schwierigkeit des KI-Clans. Je nach Stufe bekommt die KI mehr oder weniger passives Gold und entscheidet
+ * schneller und klüger (auch beim Einsatz ihres Häuptlings).
  */
 public enum AiDifficulty {
-	EASY("leicht", 60, 0.8, 0, 0.0, false),
-	NORMAL("normal", 30, 1.15, 0, 0.6, true),
-	HARD("schwer", 16, 1.4, 60, 1.0, true);
+	EASY("leicht", 60, 0.75, 0, 0.0, false),
+	NORMAL("normal", 30, 1.05, 0, 0.6, true),
+	HARD("schwer", 16, 1.3, 60, 1.0, true);
 
 	private final String id;
 	private final int decisionTicks;
@@ -40,7 +40,7 @@ public enum AiDifficulty {
 		return decisionTicks;
 	}
 
-	/** Faktor auf das passive Einkommen; ersetzt den fehlenden Häuptling. */
+	/** Faktor auf das passive Einkommen (über 1 = Vorteil für die KI). */
 	public double incomeMultiplier() {
 		return incomeMultiplier;
 	}

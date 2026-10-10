@@ -24,7 +24,6 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -48,8 +47,12 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Ein Goblin-Soldat. Läuft die Lane ab, greift das nächste feindliche Ziel an (Einheiten, Häuptling, Turm, Festungskern)
- * und sammelt dabei selbst Erfahrung (DESIGN.md Abschnitt 5).
+ * Ein Goblin-Soldat oder der Häuptling. Läuft die Lane ab, greift das nächste feindliche Ziel an (Einheiten, Häuptling,
+ * Turm, Festungskern) und sammelt dabei selbst Erfahrung (DESIGN.md Abschnitt 5).
+ *
+ * <p>Der {@link UnitType#CHIEFTAIN Häuptling} ist dieselbe Einheit mit eigenen Regeln: Leben und Schaden kommen aus dem
+ * Heldenlevel des Clans, er schlägt mit Flächenschaden zu, und solange der Spieler ihn nicht aufs Schlachtfeld schickt,
+ * bewacht er seinen Posten in der Festung (DESIGN.md Abschnitt 6).
  *
  * <p>Die ganze KI steckt in {@link #customServerAiStep}: bewusst ohne Vanilla-Goals, weil Haltung, Lane und
  * Gebäudeangriffe sich damit nur umständlich ausdrücken lassen. Die Spielwerte kommen aus {@link UnitCombat}.
@@ -78,6 +81,9 @@ public class GoblinUnit extends PathfinderMob {
 	private float laneOffset;
 	private Vec3 holdAnchor;
 	private Stance lastStance;
+	/** Häuptling, der (noch) nicht losgeschickt wurde: bewacht seinen Posten in der Festung. */
+	private boolean guarding;
+	private boolean lastGuarding;
 	private LivingEntity enemy;
 	private Structure structureTarget;
 	private TeamColor pendingAttackerTeam;
@@ -169,7 +175,12 @@ public class GoblinUnit extends PathfinderMob {
 
 	public boolean isChampion() {
 		Match match = MatchManager.match();
-		return match != null && match.combat().isChampion(unitLevel());
+		return match != null && !isChieftain() && match.combat().isChampion(unitLevel());
+	}
+
+	/** Ist diese Einheit ein Häuptling? */
+	public boolean isChieftain() {
+		return unitType() == UnitType.CHIEFTAIN;
 	}
 
 	/**
@@ -192,8 +203,12 @@ public class GoblinUnit extends PathfinderMob {
 			getAttribute(Attributes.KNOCKBACK_RESISTANCE).setBaseValue(0.9);
 		} else if (type == UnitType.CATAPULT) {
 			getAttribute(Attributes.KNOCKBACK_RESISTANCE).setBaseValue(1.0);
+		} else if (type == UnitType.CHIEFTAIN) {
+			getAttribute(Attributes.KNOCKBACK_RESISTANCE).setBaseValue(0.7);
+			entityData.set(DATA_LEVEL, (byte) match.team(team).heroLevel());
+			guarding = !match.chieftainDeployed(team);
 		}
-		int startLevel = match.team(team).startingUnitLevel(match.combat().leveling().maxLevel());
+		int startLevel = type == UnitType.CHIEFTAIN ? 1 : match.team(team).startingUnitLevel(match.combat().leveling().maxLevel());
 		if (startLevel > 1) {
 			xp = match.combat().leveling().step(startLevel).xpRequired();
 			entityData.set(DATA_LEVEL, (byte) startLevel);
@@ -203,14 +218,50 @@ public class GoblinUnit extends PathfinderMob {
 		refreshName();
 	}
 
-	/** Überträgt Level-Boni auf Lebenspunkte und Tempo. */
+	/** Überträgt Level-Boni auf Lebenspunkte und Tempo (beim Häuptling: Heldenlevel und Raserei). */
 	private void applyStats(Match match, boolean fullHeal) {
 		UnitCombat combat = match.combat();
-		double maxHealth = combat.maxHealth(unitType(), unitLevel()) * match.team(team()).armyHealthMultiplier();
+		double maxHealth;
+		double speed;
+		if (isChieftain()) {
+			maxHealth = match.chieftainMaxHealth(team());
+			speed = match.balance().unit(UnitType.CHIEFTAIN).speed() * match.chieftainSpeedMultiplier(team());
+		} else {
+			maxHealth = combat.maxHealth(unitType(), unitLevel()) * match.team(team()).armyHealthMultiplier();
+			speed = combat.speed(unitType(), unitLevel(), match.team(team()).armySpeedMultiplier());
+		}
 		double ratio = getMaxHealth() > 0 ? getHealth() / getMaxHealth() : 1.0;
 		getAttribute(Attributes.MAX_HEALTH).setBaseValue(maxHealth);
-		getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(combat.speed(unitType(), unitLevel(), match.team(team()).armySpeedMultiplier()));
+		getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(speed);
 		setHealth((float) (fullHeal ? maxHealth : Math.max(1, maxHealth * ratio)));
+	}
+
+	/**
+	 * Häuptling nach einem Heldenlevel-Aufstieg oder Beginn/Ende der Raserei neu einstellen. Bei einem Aufstieg
+	 * ({@code levelUp}) kommt der Lebenszuwachs sofort dazu.
+	 */
+	public void refreshChieftain(boolean levelUp) {
+		Match match = MatchManager.match();
+		if (match == null || !match.owns(this) || !isChieftain()) {
+			return;
+		}
+		float missing = getMaxHealth() - getHealth();
+		entityData.set(DATA_LEVEL, (byte) match.team(team()).heroLevel());
+		applyStats(match, false);
+		if (levelUp) {
+			setHealth(Math.max(1, getMaxHealth() - missing));
+		}
+		refreshName();
+	}
+
+	/** Der Spieler hat den Häuptling losgeschickt oder zurückgerufen: Ziele vergessen und neu orientieren. */
+	public void onOrdersChanged() {
+		enemy = null;
+		structureTarget = null;
+		retargetTimer = 0;
+		repathTimer = 0;
+		lastStance = null;
+		getNavigation().stop();
 	}
 
 	/** Neu berechnen, nachdem ein Upgrade gekauft wurde, das lebende Einheiten betrifft (z. B. Ausdauer). */
@@ -232,11 +283,20 @@ public class GoblinUnit extends PathfinderMob {
 			case WOLF_RIDER -> new ItemStack(Items.IRON_SPEAR);
 			case TROLL -> new ItemStack(Items.MACE);
 			case CATAPULT -> new ItemStack(Items.STICK);
+			case CHIEFTAIN -> new ItemStack(Items.GOLDEN_AXE);
 		};
 		setItemSlot(EquipmentSlot.MAINHAND, cosmetic(weapon));
 		setItemSlot(EquipmentSlot.OFFHAND, type == UnitType.WARRIOR ? cosmetic(new ItemStack(Items.SHIELD)) : ItemStack.EMPTY);
 		int level = unitLevel();
 		int color = team().rgb();
+		if (type == UnitType.CHIEFTAIN) {
+			setItemSlot(EquipmentSlot.CHEST, dyed(Items.LEATHER_CHESTPLATE.getDefaultInstance(), color));
+			setItemSlot(EquipmentSlot.LEGS, dyed(Items.LEATHER_LEGGINGS.getDefaultInstance(), color));
+			setItemSlot(EquipmentSlot.HEAD, cosmetic(new ItemStack(Items.GOLDEN_HELMET)));
+			// Immer leuchtend, damit man ihn in der Draufsicht im Getümmel findet.
+			setGlowingTag(true);
+			return;
+		}
 		setItemSlot(EquipmentSlot.CHEST, level >= 3 ? dyed(Items.LEATHER_CHESTPLATE.getDefaultInstance(), color) : ItemStack.EMPTY);
 		setItemSlot(EquipmentSlot.LEGS, level >= 3 ? dyed(Items.LEATHER_LEGGINGS.getDefaultInstance(), color) : ItemStack.EMPTY);
 		ItemStack helmet = ItemStack.EMPTY;
@@ -265,7 +325,11 @@ public class GoblinUnit extends PathfinderMob {
 	private void refreshName() {
 		int level = unitLevel();
 		MutableComponent name = Component.empty();
-		if (level > 1) {
+		if (isChieftain()) {
+			name.append(Component.literal("♛ ").withStyle(ChatFormatting.GOLD));
+			name.append(Component.translatable("unit.goblinforest.chieftain.level", level).withStyle(ChatFormatting.GOLD));
+			name.append(" ");
+		} else if (level > 1) {
 			name.append(Component.literal("★".repeat(level - 1)).withStyle(level >= 5 ? ChatFormatting.GOLD : ChatFormatting.YELLOW));
 			name.append(" ");
 		}
@@ -285,7 +349,8 @@ public class GoblinUnit extends PathfinderMob {
 	// ---------------------------------------------------------------- Erfahrung
 
 	public void addXp(double amount) {
-		if (amount <= 0 || isDeadOrDying()) {
+		// Der Häuptling steigt über das Heldenlevel des Clans auf, nicht über Veteranenstufen.
+		if (amount <= 0 || isDeadOrDying() || isChieftain()) {
 			return;
 		}
 		Match match = MatchManager.match();
@@ -324,10 +389,12 @@ public class GoblinUnit extends PathfinderMob {
 			return;
 		}
 		TeamState own = match.team(team());
-		Stance stance = own.stance();
-		if (stance != lastStance) {
+		guarding = isChieftain() && !match.chieftainDeployed(team());
+		Stance stance = guarding ? Stance.HOLD : own.stance();
+		if (stance != lastStance || guarding != lastGuarding) {
 			onStanceChanged(stance);
 			lastStance = stance;
+			lastGuarding = guarding;
 		}
 		if (unitType() == UnitType.SHAMAN && --healTimer <= 0) {
 			healTimer = match.balance().traits().shamanHealIntervalTicks();
@@ -404,7 +471,9 @@ public class GoblinUnit extends PathfinderMob {
 		if (tickCount % 20 == 0) {
 			ArenaLayout.Box zone = ArenaLayout.healZone(team());
 			if (zone.contains(blockPosition().getX(), blockPosition().getY(), blockPosition().getZ()) && getHealth() < getMaxHealth()) {
-				heal((float) (getMaxHealth() * match.balance().traits().retreatHealPercentPerSecond()));
+				// Der Häuptling erholt sich in der Festung doppelt so schnell.
+				double share = match.balance().traits().retreatHealPercentPerSecond() * (isChieftain() ? 2 : 1);
+				heal((float) (getMaxHealth() * share));
 				if (tickCount % 60 == 0) {
 					level.sendParticles(ParticleTypes.HEART, getX(), getY() + 2.1, getZ(), 1, 0.2, 0.1, 0.2, 0);
 				}
@@ -422,7 +491,7 @@ public class GoblinUnit extends PathfinderMob {
 	}
 
 	private void onStanceChanged(Stance stance) {
-		holdAnchor = stance == Stance.HOLD ? position() : null;
+		holdAnchor = stance == Stance.HOLD && !guarding ? position() : null;
 		if (stance == Stance.RETREAT) {
 			enemy = null;
 			structureTarget = null;
@@ -468,7 +537,7 @@ public class GoblinUnit extends PathfinderMob {
 				continue;
 			}
 			double score = distance;
-			boolean isHero = candidate instanceof ServerPlayer;
+			boolean isHero = candidate instanceof GoblinUnit unit && unit.isChieftain();
 			if (unitType() == UnitType.ASSASSIN) {
 				if (isHero) {
 					score *= 0.4;
@@ -510,13 +579,7 @@ public class GoblinUnit extends PathfinderMob {
 		if (!(entity instanceof LivingEntity living) || !living.isAlive()) {
 			return false;
 		}
-		if (entity instanceof GoblinUnit unit) {
-			return unit.team() != team() && !unit.isStealthed() && match.owns(unit);
-		}
-		if (entity instanceof ServerPlayer player) {
-			return match.teamOf(player) == team().opponent() && match.isTargetableHero(player);
-		}
-		return false;
+		return entity instanceof GoblinUnit unit && unit.team() != team() && !unit.isStealthed() && match.owns(unit);
 	}
 
 	private void engage(ServerLevel level, Match match, TeamState own, LivingEntity target) {
@@ -551,6 +614,9 @@ public class GoblinUnit extends PathfinderMob {
 	}
 
 	private double currentDamage(Match match, TeamState own) {
+		if (isChieftain()) {
+			return match.chieftainDamage(team());
+		}
 		return match.combat().damage(unitType(), unitLevel(), own.unitUpgrade(UpgradeType.ATTACK, unitType()));
 	}
 
@@ -580,6 +646,11 @@ public class GoblinUnit extends PathfinderMob {
 		if (charge) {
 			Knockback.away(target, getX(), getZ(), traits.wolfChargeKnockback());
 		}
+		if (unitType() == UnitType.CHIEFTAIN) {
+			cleave(level, match, target, damage * traits.chieftainCleaveShare(), traits.chieftainCleaveRadius());
+			level.playSound(null, getX(), getY(), getZ(), SoundEvents.PLAYER_ATTACK_STRONG, SoundSource.HOSTILE, 0.8f, 0.8f + getRandom().nextFloat() * 0.2f);
+			return;
+		}
 		if (unitType() == UnitType.TROLL) {
 			Knockback.away(target, getX(), getZ(), traits.trollKnockback());
 			cleave(level, match, target, damage * traits.trollCleaveShare(), traits.trollCleaveRadius());
@@ -590,13 +661,15 @@ public class GoblinUnit extends PathfinderMob {
 				SoundSource.HOSTILE, 0.5f, 1.1f + getRandom().nextFloat() * 0.3f);
 	}
 
-	/** Trollschlag: trifft auch Gegner direkt neben dem Ziel. */
+	/** Troll- und Häuptlingsschlag: trifft auch Gegner direkt neben dem Ziel. */
 	private void cleave(ServerLevel level, Match match, LivingEntity primary, double damage, double radius) {
 		AABB box = primary.getBoundingBox().inflate(radius, 1, radius);
 		for (LivingEntity other : level.getEntitiesOfClass(LivingEntity.class, box, e -> e != primary && e != this && isValidEnemy(e, match))) {
 			if (other.distanceTo(primary) <= radius) {
 				dealDamage(level, match, other, damage);
-				Knockback.away(other, getX(), getZ(), match.balance().traits().trollKnockback() * 0.6);
+				if (unitType() == UnitType.TROLL) {
+					Knockback.away(other, getX(), getZ(), match.balance().traits().trollKnockback() * 0.6);
+				}
 			}
 		}
 		level.sendParticles(ParticleTypes.SWEEP_ATTACK, primary.getX(), primary.getY() + 0.8, primary.getZ(), 2, 0.6, 0.2, 0.6, 0);
@@ -654,7 +727,7 @@ public class GoblinUnit extends PathfinderMob {
 		}
 	}
 
-	/** Heilpuls des Schamanen: heilt die am stärksten verletzten Verbündeten (Einheiten und Häuptling) im Umkreis. */
+	/** Heilpuls des Schamanen: heilt die am stärksten verletzten Verbündeten (auch den Häuptling) im Umkreis. */
 	private void healAllies(ServerLevel level, Match match, TeamState own) {
 		double radius = match.combat().shamanHealRadius(unitLevel());
 		AABB box = getBoundingBox().inflate(radius, 3, radius);
@@ -663,8 +736,7 @@ public class GoblinUnit extends PathfinderMob {
 			if (ally.distanceTo(this) > radius) {
 				continue;
 			}
-			if (ally instanceof GoblinUnit unit && match.owns(unit) && unit.team() == team()
-					|| ally instanceof ServerPlayer player && match.teamOf(player) == team() && match.isTargetableHero(player)) {
+			if (ally instanceof GoblinUnit unit && match.owns(unit) && unit.team() == team()) {
 				wounded.add(ally);
 			}
 		}
@@ -689,14 +761,10 @@ public class GoblinUnit extends PathfinderMob {
 		addXp(match.combat().leveling().xpForDamage(healed));
 	}
 
-	/** Fügt einem Ziel Schaden zu (ohne Unverwundbarkeits-Pause) und schreibt der Einheit Erfahrung gut. */
+	/** Fügt einem Ziel Schaden zu (ohne Unverwundbarkeits-Pause); die Erfahrung schreibt {@link #hurtServer} des Ziels gut. */
 	public void dealDamage(ServerLevel level, Match match, LivingEntity target, double damage) {
-		float before = target.getHealth();
 		target.invulnerableTime = 0;
-		boolean hurt = target.hurtServer(level, damageSources().mobAttack(this), (float) damage);
-		if (hurt && target instanceof ServerPlayer) {
-			addXp(match.combat().leveling().xpForDamage(Math.max(0, before - target.getHealth())));
-		}
+		target.hurtServer(level, damageSources().mobAttack(this), (float) damage);
 	}
 
 	private void engageStructure(ServerLevel level, Match match, TeamState own, Structure structure) {
@@ -826,6 +894,10 @@ public class GoblinUnit extends PathfinderMob {
 	}
 
 	private Vec3 currentHoldAnchor(Match match) {
+		if (guarding) {
+			ArenaLayout.Point post = ArenaLayout.heroSpawn(team());
+			return new Vec3(post.x(), post.y(), post.z());
+		}
 		Vec3 rally = match == null ? null : match.rallyPoint(team());
 		if (rally != null) {
 			return rally.add(laneOffset * 0.6, 0, laneOffset);
@@ -841,11 +913,38 @@ public class GoblinUnit extends PathfinderMob {
 		if (position().distanceTo(anchor) > 1.5) {
 			if (repathTimer <= 0 || getNavigation().isDone()) {
 				repathTimer = 20;
-				navigate(anchor.x, anchor.y, anchor.z, 1.0);
+				if (guarding) {
+					// Der zurückgerufene Häuptling eilt in die Festung.
+					walkHome(match, anchor, 1.15);
+				} else {
+					navigate(anchor.x, anchor.y, anchor.z, 1.0);
+				}
 			}
 		} else {
 			getNavigation().stop();
 		}
+	}
+
+	/**
+	 * Läuft zu einem Ziel in der eigenen Festung. Von weit draußen geht es über die Wegpunkte der Lane, weil die
+	 * Wegfindung nur ein Stück weit vorausplant.
+	 */
+	private void walkHome(Match match, Vec3 destination, double speed) {
+		double homeward = ArenaLayout.side(team());
+		if (Math.abs(destination.x - getX()) > 28 && match != null) {
+			double wantedX = getX() + homeward * 20;
+			ArenaLayout.Point best = null;
+			for (ArenaLayout.Point point : match.waypoints(team())) {
+				if ((point.x() - getX()) * homeward > 4 && (best == null || Math.abs(point.x() - wantedX) < Math.abs(best.x() - wantedX))) {
+					best = point;
+				}
+			}
+			if (best != null) {
+				navigate(best.x(), best.y(), best.z() + laneOffset * 0.5, speed);
+				return;
+			}
+		}
+		navigate(destination.x, destination.y, destination.z, speed);
 	}
 
 	private void retreat() {
@@ -855,7 +954,7 @@ public class GoblinUnit extends PathfinderMob {
 		if (Math.abs(getX() - tx) + Math.abs(getZ() - tz) > 2.0) {
 			if (repathTimer <= 0 || getNavigation().isDone()) {
 				repathTimer = 20;
-				navigate(tx, barracks.y(), tz, 1.15);
+				walkHome(MatchManager.match(), new Vec3(tx, barracks.y(), tz), 1.15);
 			}
 		} else {
 			getNavigation().stop();
@@ -932,9 +1031,12 @@ public class GoblinUnit extends PathfinderMob {
 			float dealt = Math.max(0, before - Math.max(0, getHealth()));
 			if (attacker instanceof GoblinUnit unit && dealt > 0 && match != null) {
 				unit.addXp(match.combat().leveling().xpForDamage(dealt));
+				if (unit.isChieftain() && match.owns(this)) {
+					match.onChieftainDealtDamage(unit, dealt);
+				}
 			}
-			if (attacker instanceof ServerPlayer player && dealt > 0 && match != null && match.owns(this)) {
-				match.onHeroDealtDamage(player, dealt);
+			if (isChieftain() && dealt > 0 && match != null && match.owns(this)) {
+				match.onChieftainDamaged(this, dealt);
 			}
 			nameTimer = 0;
 		}
@@ -1006,7 +1108,7 @@ public class GoblinUnit extends PathfinderMob {
 	@Override
 	protected SoundEvent getAmbientSound() {
 		return switch (unitType()) {
-			case TROLL -> SoundEvents.PIGLIN_BRUTE_AMBIENT;
+			case TROLL, CHIEFTAIN -> SoundEvents.PIGLIN_BRUTE_AMBIENT;
 			case SHAMAN -> SoundEvents.WITCH_AMBIENT;
 			case CATAPULT -> null;
 			default -> SoundEvents.PIGLIN_AMBIENT;
@@ -1020,11 +1122,11 @@ public class GoblinUnit extends PathfinderMob {
 
 	@Override
 	protected SoundEvent getHurtSound(DamageSource source) {
-		return unitType() == UnitType.TROLL ? SoundEvents.PIGLIN_BRUTE_HURT : SoundEvents.PIGLIN_HURT;
+		return unitType() == UnitType.TROLL || isChieftain() ? SoundEvents.PIGLIN_BRUTE_HURT : SoundEvents.PIGLIN_HURT;
 	}
 
 	@Override
 	protected SoundEvent getDeathSound() {
-		return unitType() == UnitType.TROLL ? SoundEvents.PIGLIN_BRUTE_DEATH : SoundEvents.PIGLIN_DEATH;
+		return unitType() == UnitType.TROLL || isChieftain() ? SoundEvents.PIGLIN_BRUTE_DEATH : SoundEvents.PIGLIN_DEATH;
 	}
 }

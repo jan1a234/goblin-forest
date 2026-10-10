@@ -45,7 +45,7 @@ public final class GfCommand {
 						.executes(context -> start(context, ""))
 						.then(Commands.argument("options", StringArgumentType.greedyString())
 								.suggests((context, builder) -> SharedSuggestionProvider.suggest(new String[] {"practice", "ki", "ki leicht",
-										"ki normal", "ki schwer", "bo3", "bo5", "ki bo3", "ki schwer bo3"}, builder))
+										"ki normal", "ki schwer", "bo3", "bo5", "ki bo3", "ki schwer bo3", "sd", "bo3 sd"}, builder))
 								.executes(context -> start(context, StringArgumentType.getString(context, "options")))))
 				.then(Commands.literal("stop").executes(context -> {
 					CommandSourceStack source = context.getSource();
@@ -103,13 +103,14 @@ public final class GfCommand {
 	}
 
 	/**
-	 * {@code /gf start [practice] [ki [leicht|normal|schwer]] [bo3|bo5]}: Optionen in beliebiger Reihenfolge,
-	 * auch auf Englisch (ai, easy, hard).
+	 * {@code /gf start [practice] [ki [leicht|normal|schwer]] [bo3|bo5] [sd]}: Optionen in beliebiger Reihenfolge,
+	 * auch auf Englisch (ai, easy, hard). {@code sd} schaltet den Sudden Death ein; ohne läuft das Match ohne Zeitlimit.
 	 */
 	private static int start(CommandContext<CommandSourceStack> context, String options) {
 		boolean practice = false;
 		AiDifficulty ai = null;
 		int bestOf = 1;
+		boolean suddenDeath = false;
 		for (String word : options.trim().split("\\s+")) {
 			String option = word.toLowerCase(java.util.Locale.ROOT);
 			if (option.isEmpty()) {
@@ -122,6 +123,8 @@ public final class GfCommand {
 				ai = ai == null ? AiDifficulty.NORMAL : ai;
 			} else if (option.equals("practice") || option.equals("übung") || option.equals("uebung")) {
 				practice = true;
+			} else if (option.equals("sd") || option.equals("suddendeath") || option.equals("sudden")) {
+				suddenDeath = true;
 			} else if (option.matches("bo[135]")) {
 				bestOf = option.charAt(2) - '0';
 			} else {
@@ -129,11 +132,11 @@ public final class GfCommand {
 				return 0;
 			}
 		}
-		return send(context, MatchManager.start(context.getSource().getServer(), context.getSource().getPlayer(), practice, ai, bestOf));
+		return send(context, MatchManager.start(context.getSource().getServer(), context.getSource().getPlayer(), practice, ai, bestOf, suddenDeath));
 	}
 
 	private static int help(CommandContext<CommandSourceStack> context) {
-		String[] keys = {"join", "leave", "start", "practice", "stop", "ai", "series", "status", "reset", "controls", "keys", "keys2", "units"};
+		String[] keys = {"join", "leave", "start", "practice", "stop", "ai", "series", "suddendeath", "status", "reset", "controls", "keys", "keys2", "units"};
 		context.getSource().sendSuccess(() -> Component.translatable("command.goblinforest.help.header").withStyle(ChatFormatting.GOLD), false);
 		for (String key : keys) {
 			context.getSource().sendSuccess(() -> Component.translatable("command.goblinforest.help." + key), false);

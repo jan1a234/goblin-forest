@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Setzt die Kamera in der Kommandoansicht über das Schlachtfeld. Greift am Ende von {@code alignWithEntity},
+ * Setzt die Kamera im Match über das Schlachtfeld (Draufsicht). Greift am Ende von {@code alignWithEntity},
  * damit Sichtfeld und Frustum-Culling danach schon mit der neuen Position berechnet werden.
  */
 @Mixin(Camera.class)
@@ -22,6 +22,7 @@ public abstract class CameraMixin {
 
 	@Inject(method = "alignWithEntity", at = @At("TAIL"))
 	private void goblinforest$commandView(float partialTicks, CallbackInfo ci) {
+		CommandView.rememberCamera((Camera) (Object) this);
 		CommandView.Pose pose = CommandView.pose(partialTicks);
 		if (pose != null) {
 			setRotation(pose.yaw(), pose.pitch());

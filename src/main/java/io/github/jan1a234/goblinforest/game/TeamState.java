@@ -185,6 +185,9 @@ public final class TeamState {
 
 	/** Prüft, ob eine Gruppe dieses Typs rekrutiert werden kann. {@code livingUnits} zählt alle eigenen Einheiten. */
 	public PurchaseResult checkRecruit(UnitType type, int livingUnits) {
+		if (!type.soldier()) {
+			return PurchaseResult.NOT_AVAILABLE;
+		}
 		Balance.UnitStats stats = balance.unit(type);
 		if (!isUnlocked(type)) {
 			return PurchaseResult.REPUTATION_TOO_LOW;

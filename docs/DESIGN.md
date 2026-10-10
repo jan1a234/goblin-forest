@@ -1,6 +1,6 @@
 # Goblin Forest – Design-Dokument
 
-Fabric-Mod für **Minecraft Java 26.2**. 1-gegen-1-PvP auf einem Server, gespielt aus der Third-Person-Perspektive.
+Fabric-Mod für **Minecraft Java 26.2**. 1-gegen-1-PvP auf einem Server, gespielt in der Draufsicht wie im Original (ab v1.1).
 Eigene Variante, inspiriert vom Browser-Strategiespiel *Clan Wars: Goblin Forest* (Flash, 2010).
 
 Dieses Dokument ist die Grundlage für alle weiteren Arbeitsschritte (Mod-Gerüst, Kern-Gameplay, Feinschliff).
@@ -28,23 +28,27 @@ Genaue Zahlenwerte des Originals sind öffentlich nicht dokumentiert; alle Werte
 
 ## 2. Unsere Variante: Grundidee
 
-Jeder Spieler **ist** sein Goblin-Häuptling (Warchief) und steht selbst auf dem Schlachtfeld, in Third-Person.
-Er rekrutiert Soldaten, die automatisch über die Lanes zur feindlichen Festung marschieren, kauft Upgrades, wirkt Zauber
-und kämpft mit eigenen Heldenfähigkeiten mit. Gegenüber dem Original kommen drei Dinge dazu:
+Jeder Spieler ist der **Feldherr** seines Goblin-Clans und blickt wie im Original von oben auf das Schlachtfeld
+(Draufsicht, Abschnitt 10). Er rekrutiert Soldaten, die automatisch über die Lanes zur feindlichen Festung marschieren,
+kauft Upgrades, wirkt Zauber und schickt seinen **Häuptling** (Warchief) als besonders starke Heldeneinheit in die Schlacht.
+Gegenüber dem Original kommen drei Dinge dazu:
 
 1. **Soldaten leveln einzeln** (Veteranen-System, Abschnitt 5.2), zusätzlich zu den globalen Upgrades.
 2. **3D-Schlachtfeld mit mehreren Lanes** und Wald dazwischen (Abschnitt 4).
-3. **Der Held ist der Spieler selbst**, mit eigenem Level und Fähigkeitenbaum (Abschnitt 6).
+3. **Der Häuptling ist eine eigene Einheit** mit Level 1–10 und Fähigkeitenbaum, die der Spieler aus der Ferne führt (Abschnitt 6).
+
+> Änderung 10.10.2026 (Jan): Bis v1.0 war der Spieler selbst der Häuptling und lief in Third-Person über das Feld.
+> Ab v1.1 ist der Spieler nur noch Feldherr in der Draufsicht; der Häuptling wird wie eine Einheit losgeschickt.
 
 ## 3. Match-Ablauf
 
 | Phase | Ablauf | Stufe |
 |---|---|---|
 | Lobby | `/gf join` (oder `/gf join rot|gruen`), `/gf start` startet bei 2 Spielern. Admin: `/gf stop`, `/gf reset`. | [MVP] |
-| Aufbau | Arena wird in einer eigenen Dimension `goblinforest:arena` (leere Void-Welt) gebaut, Spieler werden teleportiert, Inventar wird gesichert und durch die Match-Ausrüstung ersetzt. Die normale Welt des Servers bleibt unberührt. | [MVP] |
-| Countdown | 10 s, beide Spieler sind in ihrer Festung eingefroren. | [MVP] |
+| Aufbau | Arena wird in einer eigenen Dimension `goblinforest:arena` (leere Void-Welt) gebaut, Spieler werden teleportiert, Inventar und Spielmodus werden gesichert. Die Spieler schweben danach unsichtbar und unverwundbar (Zuschauermodus) über ihrer Festung. Die normale Welt des Servers bleibt unberührt. | [MVP] |
+| Countdown | 10 s; beide Häuptlinge stehen in ihrer Festung, die Draufsicht ist schon aktiv. | [MVP] |
 | Kampf | Echtzeit. Startgold 150, passives Einkommen +2 Gold/s. | [MVP] |
-| Sudden Death | Ab Minute 25 verlieren beide Festungen 0,5 % HP pro Sekunde, damit kein Match endlos dauert. | [v1.0] |
+| Sudden Death | Standardmäßig **aus**: Ein Match läuft, bis eine Festung fällt. Nur mit `/gf start sd` verlieren ab Minute 25 beide Festungen 0,5 % HP pro Sekunde. | [v1.1] |
 | Ende | Festungskern auf 0 HP: Sieg-/Niederlage-Titel, Statistik im Chat (Kills, Gold, höchstes Einheitenlevel), nach 15 s Rückteleport und Inventar-Wiederherstellung. | [MVP] |
 | Weitere Modi | Best-of-3/5 und Match gegen KI-Clan [v1.0] (Abschnitt 10a); 2v2 [Später]. | [v1.0] |
 
@@ -122,19 +126,27 @@ Wie die Angriff/Rückzug-Befehle des Originals, gilt für alle eigenen Einheiten
 - **Halten**: an der aktuellen Position bzw. am gesetzten Sammelbanner stehen bleiben und verteidigen.
 - **Rückzug**: zurück zur eigenen Festung; dort werden Einheiten langsam geheilt (+2 % HP/s).
 
-## 6. Der Warchief (Spieler)
+## 6. Der Häuptling (Warchief)
 
-Der Spieler läuft selbst als Goblin-Häuptling über das Feld. Er hat 200 HP, eine Clan-Waffe (Axt, 12 Schaden)
-und darf den gegnerischen Spieler direkt angreifen. Stirbt er, respawnt er nach **8 s + 1 s pro Helden-Level** in der eigenen Festung,
-und der Gegner erhält 100 Gold Kopfgeld.
+Der Häuptling ist eine eigene Einheit (`UnitType.CHIEFTAIN`) mit goldenem Helm, Krone und Kriegsbemalung. Zu Rundenbeginn
+steht er in der eigenen Festung und bewacht sie. Der Spieler schickt ihn mit dem Helm-Feld der Befehlsleiste (oder Taste Q)
+aufs Schlachtfeld; dort folgt er wie die Soldaten der Lane-KI und der Haltung der Armee. Derselbe Klick ruft ihn zurück in die
+Festung, wo er doppelt so schnell heilt. Er hat 320 HP (+40 pro Level) und 16 Schaden (+2,5 pro Level), trifft mit seiner
+Axt auch Gegner neben dem Ziel (40 % Schaden im Umkreis von 2,2 Blöcken) und lässt sich kaum zurückstoßen.
+
+Fällt er, erhält der Gegner 100 Gold Kopfgeld und Clan-Erfahrung. Nach **12 s + 2 s pro Level** steht er in der Festung wieder auf
+und zieht von selbst wieder los, wenn er vorher losgeschickt war.
 
 | Element | Beschreibung | Stufe |
 |---|---|---|
-| Helden-Level 1–10 | Erfahrung aus allen Kills der eigenen Armee (25 %) und eigenen Kills (100 %). Pro Level +15 HP, +1 Schaden. | [MVP] |
-| Blutrausch (Taste R) | Eigene Einheiten in 12 Blöcken: +30 % Angriffstempo für 8 s. Abklingzeit 30 s. | [MVP] |
-| Kampfstampfer (Taste G) | Flächenschlag, 30 Schaden in 5 Blöcken, schleudert Gegner zurück. Abklingzeit 15 s. | [MVP] |
-| Raserei (Taste Y) | Lädt sich durch erlittenen und verursachten Schaden auf. Voll: 10 s +60 % Schaden, +30 % Tempo, Lebensraub 20 % (je Rang +10 % Schaden, +2 s, +5 % Lebensraub). | [v1.0] |
-| Fähigkeitspunkte | Pro Helden-Level 1 Punkt zum Verstärken einer Fähigkeit (je 3 Ränge), verteilt im Reiter „Häuptling“ des Kriegsmenüs. | [v1.0] |
+| Häuptlings-Level 1–10 | Erfahrung aus allen Kills der eigenen Armee (25 %) und eigenen Kills (100 %). | [MVP] |
+| Blutrausch (Taste R / 6) | Eigene Einheiten in 12 Blöcken um den Häuptling: +30 % Angriffstempo für 8 s. Abklingzeit 30 s. | [MVP] |
+| Kampfstampfer (Taste G / 7) | Flächenschlag um den Häuptling, 30 Schaden in 5 Blöcken, schleudert Gegner zurück. Abklingzeit 15 s. | [MVP] |
+| Raserei (Taste Y / 8) | Lädt sich durch erlittenen und verursachten Schaden auf. Voll: 10 s +60 % Schaden, +30 % Tempo, Lebensraub 20 % (je Rang +10 % Schaden, +2 s, +5 % Lebensraub). | [v1.0] |
+| Fähigkeitspunkte | Pro Level 1 Punkt zum Verstärken einer Fähigkeit (je 3 Ränge), verteilt im Reiter „Häuptling“ des Kriegsmenüs. | [v1.0] |
+
+Die Fähigkeiten löst der Spieler aus der Ferne aus (Feld in der Befehlsleiste oder Taste); sie wirken um den Häuptling herum.
+Ist er gefallen, sind sie gesperrt.
 
 ## 7. Wirtschaft und Ressourcen
 
@@ -150,7 +162,7 @@ Anzeige oben links wie im Original: **Gold, Erfahrung, Ruf, Bevölkerung**.
 
 ## 8. Zauber
 
-Werden vom Spieler mit Blick auf eine Stelle gewirkt (Raycast bis 40 Blöcke). Kosten Gold, haben Abklingzeiten und werden über Rufstufen und Gold stärker (Stufe 1–3).
+Werden in der Draufsicht gewirkt: Zauber in der Befehlsleiste anklicken (oder Taste), dann die Zielstelle im Feld; ein Kreis am Boden zeigt den Wirkungsbereich. Kosten Gold, haben Abklingzeiten und werden über Rufstufen und Gold stärker (Stufe 1–3).
 
 | Zauber | Wirkung (Stufe 1) | Gold | Abklingzeit | Ruf nötig | Stufe |
 |---|---|---|---|---|---|
@@ -172,15 +184,26 @@ Werden vom Spieler mit Blick auf eine Stelle gewirkt (Raycast bis 40 Blöcke). K
 
 ## 10. Steuerung und Kamera
 
-- **Third-Person erzwungen** während des Matches, Kamera hinter dem Spieler. [MVP] nutzt die normale Third-Person-Kamera (F5); [v1.0] Abstand mit Bild↑/Bild↓ von 3 bis 14 Blöcken einstellbar (Standard 7).
-- **Kommandoansicht** (linke Alt-Taste; Tab ist in Minecraft schon die Spielerliste): Kamera fährt schräg über das Schlachtfeld, der Häuptling bleibt stehen. Bewegungstasten schwenken über die Lane (Sprinttaste doppelt so schnell), Bild↑/Bild↓ zoomt, die eigene Festung liegt immer links. Zauber und Sammelpunkt zielen auf die Bildmitte. Endet beim Tod des Häuptlings und am Rundenende. [v1.0]
-- **Kriegsmenü** (Taste B): Bildschirm mit Knöpfen wie die Leiste im Original, Tabs *Einheiten / Upgrades / Festung / Zauber* [MVP] und *Häuptling* (Fähigkeitsränge, Raserei) [v1.0], zeigt Kosten, Stufe, gesperrte Einträge und Erklärungen als Tooltip.
+- **Nur Draufsicht** [v1.1]: Vom Countdown bis zum Matchende blickt die Kamera schräg von oben auf das Schlachtfeld, die eigene
+  Festung liegt immer links. Es gibt keine Ich- oder Verfolgerperspektive und nichts zum Umschalten. Schwenken mit W/A/S/D oder
+  den Pfeiltasten (Sprinttaste doppelt so schnell) oder durch Ziehen mit gedrückter linker Maustaste, zoomen mit dem Mausrad
+  oder +/- (14 bis 80 Blöcke Abstand), Leertaste springt zum Häuptling. Geräusche hört man an der Bildmitte.
+- Der Mauszeiger ist im Match immer frei (unsichtbarer Bildschirm `CommandScreen`). Alles ist per Maus bedienbar.
+- **Befehlsleiste unten links** [v1.1]: obere Reihe die acht Einheiten, Haltung und Sammelbanner; untere Reihe die fünf Zauber,
+  der Häuptling (losschicken/zurückrufen), seine drei Fähigkeiten und das Kriegsmenü. Jedes Feld zeigt Symbol, Taste, Preis bzw.
+  Abklingzeit und ist grau, wenn Gold, Ruf oder Abklingzeit fehlen; der Tooltip nennt den Grund. Zauber und Sammelbanner warten
+  nach dem Klick auf einen Klick ins Feld, Rechtsklick oder Esc bricht ab.
+- **Kriegsmenü** (Taste B oder Buch in der Leiste): Tabs *Einheiten / Upgrades / Festung / Zauber* [MVP] und *Häuptling*
+  (Fähigkeitsränge, Raserei, losschicken) [v1.0], zeigt Kosten, Stufe, gesperrte Einträge und Erklärungen als Tooltip.
 - **Schnelltasten** (frei belegbar über die Minecraft-Tastenbelegung):
   - Einheiten rekrutieren: Z / X / C / V, dazu U / I / O / M für Schamane, Wolfsreiter, Troll und Katapult
-  - Haltung: H (Vorrücken → Halten → Rückzug durchschalten)
-  - Fähigkeiten: R / G / Y; Zauber: J / K oder Rechtsklick mit dem Zauber in der Hotbar (Plätze 2–6)
-- **HUD** [MVP]: oben links Gold / Erfahrung / Ruf / Bevölkerung, oben Mitte beide Festungs-Lebensbalken, unten rechts Abklingzeiten, Lebensbalken über Einheiten (mit Level-Sternen).
-- Die normale Hotbar und das Inventar sind im Match gesperrt (nur die Clan-Waffe).
+  - Häuptling losschicken/zurückrufen: Q (oder 9); Haltung: H; Sammelbanner: N
+  - Zauber: 1–5 (Feuerball und Pilze auch J / K); Fähigkeiten: 6–8 bzw. R / G / Y
+  - Esc bricht einen gewählten Zauber ab, sonst Pausemenü; T öffnet den Chat
+- **HUD**: oben Mitte beide Festungs-Lebensbalken und Spielzeit, darunter Runden, Sudden Death (nur wenn eingeschaltet) und freie
+  Fähigkeitspunkte; oben links Gold, Ruf, Armee, Haltung und Gegner; unten links die Befehlsleiste; unten rechts der Häuptling
+  (Zustand, Leben, Erfahrung, Raserei). Vanilla-Hotbar, Herzen und Fadenkreuz sind ausgeblendet. Die Leiste passt auch in die
+  kleinste GUI (320 × 240); der Client-Test prüft, dass kein Feld abgeschnitten ist.
 
 ## 10a. KI-Gegner und Serien [v1.0]
 
@@ -188,7 +211,9 @@ Werden vom Spieler mit Blick auf eine Stelle gewirkt (Raycast bis 40 Blöcke). K
   Haltung (Rückzug, wenn deutlich unterlegen und der Feind in der eigenen Hälfte steht), Zauber auf die dichteste Gegnergruppe,
   Upgrades und Ausbauten nach Bedarf (Hütten bei voller Armee, Mauern bei angeschlagener Festung, Kanone bei Angriff, Goldmine)
   und Rekrutierung nach einer Soll-Mischung, die ab „normal“ auf die gegnerische Armee reagiert (Wolfsreiter gegen Fernkämpfer usw.).
-- Die KI hat keinen Häuptling. Ausgleich über das Grundeinkommen: leicht ×0,8, normal ×1,15, schwer ×1,4 (+60 Startgold).
+- Die KI führt ihren Häuptling selbst: Sie schickt ihn los, sobald ihre Armee stark genug ist oder der Feind in ihrer Hälfte steht,
+  ruft ihn ab „normal“ unter 30 % Leben zurück, setzt Kampfstampfer, Raserei und Blutrausch passend ein und verteilt
+  Fähigkeitspunkte. Grundeinkommen: leicht ×0,75, normal ×1,05, schwer ×1,3 (+60 Startgold).
 - `/gf start bo3` / `bo5`: Best-of-Serie. Nach jeder Runde 20 s Pause, dann neue Runde mit frisch gebauter Arena; Spieler bleiben
   dabei in der Arena, ihre Sicherung von vor der ersten Runde wird erst am Ende der Serie zurückgegeben. Das HUD zeigt den Stand.
 
@@ -246,6 +271,7 @@ Damit zwei Spieler ein komplettes Match spielen können, wird genau das gebaut:
 6. Gold mit Frontfaktor-Kopfgeld, Clan-Erfahrung, Ruf, Bevölkerungslimit.
 7. Warchief mit Level 1–10, Blutrausch, Kampfstampfer; Zauber Feuerball und Heilende Pilze.
 8. Haltungen Vorrücken / Halten / Rückzug.
-9. Kriegsmenü (B), Schnelltasten, HUD, erzwungene Third-Person-Kamera.
+9. Kriegsmenü (B), Schnelltasten, HUD, Kamera (bis v1.0 Third-Person, ab v1.1 nur Draufsicht).
 
-Mit dem Feinschliff (v1.0) dazugekommen: Schamane, Troll, Wolfsreiter, Katapult, Champion-Fähigkeiten und Raserei, Kanone, Goldmine, Wurzelfessel, Blitzsturm und Meteor, Kommandoansicht, eigene Klänge, Sudden Death, Best-of-Serien und KI-Gegner. Noch offen (**[Später]**): drei Lanes, 2v2, gestaltete Arena-Vorlage und komplett eigene Modelle.
+Mit dem Feinschliff (v1.0) dazugekommen: Schamane, Troll, Wolfsreiter, Katapult, Champion-Fähigkeiten und Raserei, Kanone, Goldmine, Wurzelfessel, Blitzsturm und Meteor, Kommandoansicht, eigene Klänge, Sudden Death, Best-of-Serien und KI-Gegner.
+Mit v1.1: Häuptling als eigene Einheit, nur noch Draufsicht mit Maussteuerung und Befehlsleiste unten links, Sudden Death nur noch auf Wunsch. Noch offen (**[Später]**): drei Lanes, 2v2, gestaltete Arena-Vorlage und komplett eigene Modelle.

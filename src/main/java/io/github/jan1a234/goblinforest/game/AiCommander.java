@@ -2,6 +2,7 @@ package io.github.jan1a234.goblinforest.game;
 
 import io.github.jan1a234.goblinforest.arena.ArenaLayout;
 import io.github.jan1a234.goblinforest.config.Balance;
+import io.github.jan1a234.goblinforest.hero.AbilityType;
 import io.github.jan1a234.goblinforest.spell.SpellType;
 import io.github.jan1a234.goblinforest.unit.GoblinUnit;
 import io.github.jan1a234.goblinforest.unit.UnitType;
@@ -11,13 +12,13 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Random;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 
 /**
  * Führt einen Clan ohne Spieler: rekrutiert eine gemischte Armee (auf „normal“ und „schwer“ gezielt gegen die
- * Armee des Gegners), kauft Upgrades und Festungsausbauten, wirkt Zauber auf Gruppen und wählt die Haltung.
+ * Armee des Gegners), kauft Upgrades und Festungsausbauten, wirkt Zauber auf Gruppen, wählt die Haltung und
+ * führt den eigenen Häuptling (losschicken, bei wenig Leben zurückrufen, Fähigkeiten und Fähigkeitspunkte).
  *
  * <p>Die KI benutzt dieselben Kaufwege wie ein Spieler ({@link TeamState}-Prüfungen, Kosten, Ruf, Abklingzeiten);
  * sie bekommt nur je nach Schwierigkeit mehr oder weniger passives Gold (siehe {@link AiDifficulty}).
@@ -68,13 +69,14 @@ final class AiCommander {
 		if (difficulty.counters()) {
 			buyUpgrades(situation);
 		}
+		commandChieftain(situation);
 		recruit(situation);
 	}
 
 	// ---------------------------------------------------------------- Lagebild
 
 	/** Was die KI über das Schlachtfeld weiß (dasselbe, was ein Spieler sehen kann). */
-	private record Situation(List<GoblinUnit> own, List<GoblinUnit> enemies, List<ServerPlayer> enemyHeroes,
+	private record Situation(List<GoblinUnit> own, List<GoblinUnit> enemies, GoblinUnit enemyChieftain,
 			double ownStrength, double enemyStrength, int enemiesInOurHalf, EnumMap<UnitType, Integer> ownCounts,
 			EnumMap<UnitType, Integer> enemyCounts) {
 	}
@@ -82,12 +84,7 @@ final class AiCommander {
 	private Situation survey() {
 		List<GoblinUnit> own = match.unitsOf(team);
 		List<GoblinUnit> enemies = match.unitsOf(enemy);
-		List<ServerPlayer> heroes = new ArrayList<>();
-		for (ServerPlayer player : match.onlineHeroes(enemy)) {
-			if (match.isTargetableHero(player)) {
-				heroes.add(player);
-			}
-		}
+		GoblinUnit enemyChieftain = match.chieftain(enemy);
 		EnumMap<UnitType, Integer> ownCounts = counts(own);
 		EnumMap<UnitType, Integer> enemyCounts = counts(enemies);
 		int inOurHalf = 0;
@@ -96,22 +93,29 @@ final class AiCommander {
 				inOurHalf++;
 			}
 		}
-		double enemyStrength = strength(enemies);
-		for (ServerPlayer hero : heroes) {
-			enemyStrength += 60 + 25 * match.team(enemy).heroLevel();
-		}
-		return new Situation(own, enemies, heroes, strength(own), enemyStrength, inOurHalf, ownCounts, enemyCounts);
+		double enemyStrength = strength(enemies) + chieftainStrength(enemy);
+		double ownStrength = strength(own) + chieftainStrength(team);
+		return new Situation(own, enemies, enemyChieftain, ownStrength, enemyStrength, inOurHalf, ownCounts, enemyCounts);
 	}
 
 	private static EnumMap<UnitType, Integer> counts(List<GoblinUnit> units) {
 		EnumMap<UnitType, Integer> counts = new EnumMap<>(UnitType.class);
-		for (UnitType type : UnitType.values()) {
+		for (UnitType type : UnitType.soldiers()) {
 			counts.put(type, 0);
 		}
 		for (GoblinUnit unit : units) {
 			counts.merge(unit.unitType(), 1, Integer::sum);
 		}
 		return counts;
+	}
+
+	/** Kampfkraft eines Häuptlings, der auf dem Feld kämpft, grob als Goldwert. */
+	private double chieftainStrength(TeamColor of) {
+		GoblinUnit chief = match.chieftain(of);
+		if (chief == null || !match.chieftainDeployed(of)) {
+			return 0;
+		}
+		return (60 + 25 * match.team(of).heroLevel()) * (chief.getHealth() / Math.max(1, chief.getMaxHealth()));
 	}
 
 	/** Kampfkraft grob als Goldwert, gewichtet mit Level und verbleibendem Leben. */
@@ -148,6 +152,67 @@ final class AiCommander {
 		}
 	}
 
+	// ---------------------------------------------------------------- Häuptling
+
+	/**
+	 * Schickt den Häuptling los, sobald die Armee mitziehen kann, ruft ihn bei wenig Leben zurück (nicht auf „leicht“),
+	 * verteilt Fähigkeitspunkte und setzt Fähigkeiten ein, wenn genug Gegner bzw. eigene Goblins in der Nähe sind.
+	 */
+	private void commandChieftain(Situation s) {
+		TeamState state = match.team(team);
+		for (AbilityType ability : new AbilityType[] {AbilityType.BATTLE_SLAM, AbilityType.RAGE, AbilityType.BLOODLUST}) {
+			if (state.checkAbilityRank(ability) == PurchaseResult.OK && state.abilityRank(ability) <= minRank(state)) {
+				state.buyAbilityRank(ability);
+			}
+		}
+		GoblinUnit chief = match.chieftain(team);
+		if (chief == null) {
+			return;
+		}
+		double health = chief.getHealth() / Math.max(1, chief.getMaxHealth());
+		boolean deployed = match.chieftainDeployed(team);
+		if (deployed && difficulty != AiDifficulty.EASY && health < 0.3) {
+			match.commandChieftain(team, false);
+			return;
+		}
+		boolean ready = health > 0.8 && (difficulty == AiDifficulty.EASY || s.own().size() >= 4 || s.enemiesInOurHalf() > 0);
+		if (!deployed && ready) {
+			match.commandChieftain(team, true);
+		}
+		if (difficulty == AiDifficulty.EASY && random.nextDouble() > 0.4) {
+			return;
+		}
+		int enemiesNear = countNear(s.enemies(), chief, 5);
+		int alliesNear = countNear(s.own(), chief, 12);
+		if (enemiesNear >= 3) {
+			match.useAbility(team, AbilityType.BATTLE_SLAM);
+		}
+		if (enemiesNear >= 2 || s.enemyChieftain() != null && s.enemyChieftain().distanceTo(chief) < 6) {
+			match.useAbility(team, AbilityType.RAGE);
+		}
+		if (alliesNear >= 4 && countNear(s.enemies(), chief, 14) >= 3) {
+			match.useAbility(team, AbilityType.BLOODLUST);
+		}
+	}
+
+	private static int minRank(TeamState state) {
+		int min = Integer.MAX_VALUE;
+		for (AbilityType ability : AbilityType.values()) {
+			min = Math.min(min, state.abilityRank(ability));
+		}
+		return min;
+	}
+
+	private static int countNear(List<GoblinUnit> units, GoblinUnit center, double radius) {
+		int count = 0;
+		for (GoblinUnit unit : units) {
+			if (unit.distanceToSqr(center) <= radius * radius) {
+				count++;
+			}
+		}
+		return count;
+	}
+
 	// ---------------------------------------------------------------- Rekrutieren
 
 	private void recruit(Situation s) {
@@ -181,7 +246,7 @@ final class AiCommander {
 		int living = match.unitsOf(team).size();
 		EnumMap<UnitType, Double> weights = new EnumMap<>(UnitType.class);
 		double total = 0;
-		for (UnitType type : UnitType.values()) {
+		for (UnitType type : UnitType.soldiers()) {
 			PurchaseResult check = state.checkRecruit(type, living);
 			if (check != PurchaseResult.OK && check != PurchaseResult.NOT_ENOUGH_GOLD) {
 				continue;
@@ -345,14 +410,16 @@ final class AiCommander {
 	/** Bester Punkt für einen Angriffszauber, oder null, wenn sich der Zauber gerade nicht lohnt. */
 	private Vec3 attackTarget(SpellType spell, Situation s, double radius) {
 		List<LivingEntity> targets = new ArrayList<>(s.enemies());
-		targets.addAll(s.enemyHeroes());
+		if (s.enemyChieftain() != null) {
+			targets.add(s.enemyChieftain());
+		}
 		LivingEntity bestCenter = null;
 		double bestValue = 0;
 		for (LivingEntity center : targets) {
 			double value = 0;
 			for (LivingEntity other : targets) {
 				if (other.distanceToSqr(center) <= radius * radius) {
-					value += other instanceof ServerPlayer ? 2.5 : 1.0;
+					value += other == s.enemyChieftain() ? 2.5 : 1.0;
 				}
 			}
 			if (value > bestValue) {
