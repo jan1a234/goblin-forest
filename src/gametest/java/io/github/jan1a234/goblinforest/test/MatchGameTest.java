@@ -58,7 +58,13 @@ public class MatchGameTest {
 		// Der rote Häuptling hat die Festung verlassen; der grüne ist nach seinem Tod wieder auferstanden.
 		boolean[] marched = {false};
 		boolean[] greenBack = {false};
+		// Eine fehlgeschlagene Prüfung wird bei jedem Tick erneut gemeldet; sonst liefe Stufe 0 noch einmal
+		// und die eigentliche Ursache ginge in Folgefehlern unter.
+		RuntimeException[] firstFailure = {null};
 		helper.onEachTick(() -> {
+			if (firstFailure[0] != null) {
+				throw firstFailure[0];
+			}
 			switch (stage[0]) {
 				case 0 -> {
 					if (MatchManager.match() != match) {
@@ -66,11 +72,16 @@ public class MatchGameTest {
 					} else if (match.phase() == MatchPhase.SETUP && helper.getTick() > SETUP_LIMIT) {
 						helper.fail("Arena-Aufbau dauert zu lange");
 					} else if (match.phase() == MatchPhase.BATTLE) {
-						checkArenaBuilt(helper, arena);
-						recruitArmies(helper, match);
-						buildStrongholds(helper, match, arena);
-						castSpells(helper, match);
-						checkChieftains(helper, match);
+						try {
+							checkArenaBuilt(helper, arena);
+							checkChieftains(helper, match);
+							recruitArmies(helper, match);
+							buildStrongholds(helper, match, arena);
+							castSpells(helper, match);
+						} catch (RuntimeException e) {
+							firstFailure[0] = e;
+							throw e;
+						}
 						stage[0] = 1;
 					}
 				}
