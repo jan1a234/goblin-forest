@@ -61,6 +61,6 @@ class SeriesTest {
 	void aiIncomeMultiplierScalesOnlyBaseIncome() {
 		TeamState team = new TeamState(TeamColor.GREEN, io.github.jan1a234.goblinforest.config.BalanceLoader.loadDefaults());
 		team.setIncomeMultiplier(AiDifficulty.HARD.incomeMultiplier());
-		assertEquals(2.0 * 1.4, team.incomePerSecond(), 1e-9);
+		assertEquals(2.0 * 1.3, team.incomePerSecond(), 1e-9);
 	}
 }

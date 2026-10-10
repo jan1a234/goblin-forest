@@ -10,13 +10,13 @@ class HeroProgressionTest {
 
 	@Test
 	void statsPerLevelFollowDesign() {
-		assertEquals(200, hero.maxHealth(1), 1e-9);
-		assertEquals(215, hero.maxHealth(2), 1e-9);
-		assertEquals(12, hero.damage(1), 1e-9);
-		assertEquals(21, hero.damage(10), 1e-9);
-		// 8 s + 1 s pro Level.
-		assertEquals(9, hero.respawnSeconds(1));
-		assertEquals(18, hero.respawnSeconds(10));
+		assertEquals(320, hero.maxHealth(1), 1e-9);
+		assertEquals(360, hero.maxHealth(2), 1e-9);
+		assertEquals(16, hero.damage(1), 1e-9);
+		assertEquals(38.5, hero.damage(10), 1e-9);
+		// 12 s + 2 s pro Level.
+		assertEquals(14, hero.respawnSeconds(1));
+		assertEquals(32, hero.respawnSeconds(10));
 	}
 
 	@Test

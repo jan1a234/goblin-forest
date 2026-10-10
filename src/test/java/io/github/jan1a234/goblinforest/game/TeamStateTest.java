@@ -314,7 +314,7 @@ class TeamStateTest {
 		assertEquals(PurchaseResult.REPUTATION_TOO_LOW, team.checkRecruit(UnitType.CATAPULT, 0));
 		team.addClanXp(400 * 4);
 		assertEquals(4, team.reputation());
-		for (UnitType type : UnitType.values()) {
+		for (UnitType type : UnitType.soldiers()) {
 			assertEquals(PurchaseResult.OK, team.checkRecruit(type, 0), type.id());
 		}
 	}

@@ -19,7 +19,7 @@ class UnitLevelingTest {
 
 	@Test
 	void everyUnitTypeHasStats() {
-		for (UnitType type : UnitType.values()) {
+		for (UnitType type : UnitType.soldiers()) {
 			assertEquals(true, balance.unit(type).cost() > 0, type.id());
 		}
 	}

@@ -12,7 +12,9 @@ import io.github.jan1a234.goblinforest.game.PurchaseResult;
 import io.github.jan1a234.goblinforest.game.Structure;
 import io.github.jan1a234.goblinforest.game.TeamColor;
 import io.github.jan1a234.goblinforest.game.TeamState;
+import io.github.jan1a234.goblinforest.hero.AbilityType;
 import io.github.jan1a234.goblinforest.spell.SpellType;
+import io.github.jan1a234.goblinforest.unit.GoblinUnit;
 import io.github.jan1a234.goblinforest.unit.UnitType;
 import io.github.jan1a234.goblinforest.upgrade.UpgradeKey;
 import io.github.jan1a234.goblinforest.upgrade.UpgradeType;
@@ -27,7 +29,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * Spielt auf einem echten Minecraft-Server ein Match ohne Spieler durch: Arena bauen, Countdown,
  * beide Clans rekrutieren (Grün zusätzlich von der KI geführt), die Armeen laufen die Lane entlang und kämpfen,
- * Einheiten sterben und steigen auf, am Ende fällt eine Festung, und die Best-of-3-Serie startet Runde 2. Läuft in der CI mit {@code ./gradlew runGameTest}.
+ * Einheiten sterben und steigen auf, der rote Häuptling zieht los, der grüne fällt und wird wiederbelebt,
+ * am Ende fällt eine Festung, und die Best-of-3-Serie startet Runde 2. Läuft in der CI mit {@code ./gradlew runGameTest}.
  */
 public class MatchGameTest {
 	private static final int SETUP_LIMIT = 20 * 30;
@@ -49,10 +52,19 @@ public class MatchGameTest {
 		// Der Gametest-Server kennt keine Datenpaket-Dimensionen; die Arena entsteht deshalb in der Testwelt.
 		// Grün wird zusätzlich von der KI (schwer) geführt, und es ist Runde 1 einer Best-of-3-Serie.
 		Match match = MatchManager.startWithoutPlayers(helper.getLevel().getServer(), helper.getLevel(),
-				new MatchOptions(true, AiDifficulty.HARD, new Series(3)));
+				new MatchOptions(true, AiDifficulty.HARD, new Series(3), false));
 		ServerLevel arena = match.arena();
 		int[] stage = {0};
+		// Der rote Häuptling hat die Festung verlassen; der grüne ist nach seinem Tod wieder auferstanden.
+		boolean[] marched = {false};
+		boolean[] greenBack = {false};
+		// Eine fehlgeschlagene Prüfung wird bei jedem Tick erneut gemeldet; sonst liefe Stufe 0 noch einmal
+		// und die eigentliche Ursache ginge in Folgefehlern unter.
+		RuntimeException[] firstFailure = {null};
 		helper.onEachTick(() -> {
+			if (firstFailure[0] != null) {
+				throw firstFailure[0];
+			}
 			switch (stage[0]) {
 				case 0 -> {
 					if (MatchManager.match() != match) {
@@ -60,10 +72,16 @@ public class MatchGameTest {
 					} else if (match.phase() == MatchPhase.SETUP && helper.getTick() > SETUP_LIMIT) {
 						helper.fail("Arena-Aufbau dauert zu lange");
 					} else if (match.phase() == MatchPhase.BATTLE) {
-						checkArenaBuilt(helper, arena);
-						recruitArmies(helper, match);
-						buildStrongholds(helper, match, arena);
-						castSpells(helper, match);
+						try {
+							checkArenaBuilt(helper, arena);
+							checkChieftains(helper, match);
+							recruitArmies(helper, match);
+							buildStrongholds(helper, match, arena);
+							castSpells(helper, match);
+						} catch (RuntimeException e) {
+							firstFailure[0] = e;
+							throw e;
+						}
 						stage[0] = 1;
 					}
 				}
@@ -76,7 +94,11 @@ public class MatchGameTest {
 					TeamState green = match.team(TeamColor.GREEN);
 					int kills = red.stats().unitKills + green.stats().unitKills;
 					int bestLevel = Math.max(red.stats().highestUnitLevel, green.stats().highestUnitLevel);
-					if (kills >= 3 && bestLevel >= 2) {
+					GoblinUnit redChief = match.chieftain(TeamColor.RED);
+					marched[0] |= redChief != null && !ArenaLayout.healZone(TeamColor.RED).contains(
+							redChief.blockPosition().getX(), redChief.blockPosition().getY(), redChief.blockPosition().getZ());
+					greenBack[0] |= match.chieftain(TeamColor.GREEN) != null;
+					if (kills >= 3 && bestLevel >= 2 && marched[0] && greenBack[0]) {
 						io.github.jan1a234.goblinforest.GoblinForest.LOGGER.info(
 								"[Selbsttest] Tick {}: {} Kills, beste Stufe {}, Gold rot {} / grün {}, Goblins {}",
 								helper.getTick(), kills, bestLevel, red.gold(), green.gold(), match.unitCount());
@@ -118,6 +140,37 @@ public class MatchGameTest {
 		});
 	}
 
+	/**
+	 * Beide Häuptlinge stehen zu Beginn in ihrer Festung. Der rote wird losgeschickt und setzt den Kampfstampfer ein,
+	 * der grüne fällt (Kopfgeld und Heldenerfahrung für Rot) und muss danach wiederbelebt werden.
+	 */
+	private static void checkChieftains(GameTestHelper helper, Match match) {
+		for (TeamColor team : TeamColor.values()) {
+			GoblinUnit chief = match.chieftain(team);
+			helper.assertTrue(chief != null && chief.isChieftain(), "Kein Häuptling für " + team);
+			helper.assertTrue(match.isChieftain(chief), "Häuptling von " + team + " wird nicht erkannt");
+			helper.assertTrue(Math.abs(chief.getMaxHealth() - match.chieftainMaxHealth(team)) < 0.01, "Häuptling " + team + " hat falsche Lebenspunkte");
+		}
+		match.commandChieftain(TeamColor.RED, true);
+		helper.assertTrue(match.chieftainDeployed(TeamColor.RED), "Roter Häuptling wurde nicht losgeschickt");
+		PurchaseResult slam = match.useAbility(TeamColor.RED, AbilityType.BATTLE_SLAM);
+		helper.assertTrue(slam.ok(), "Kampfstampfer fehlgeschlagen: " + slam);
+		helper.assertTrue(match.useAbility(TeamColor.RED, AbilityType.RAGE) == PurchaseResult.NOT_CHARGED, "Raserei sollte noch nicht geladen sein");
+
+		TeamState red = match.team(TeamColor.RED);
+		int goldBefore = red.gold();
+		double xpBefore = red.heroXp();
+		GoblinUnit green = match.chieftain(TeamColor.GREEN);
+		green.hurtByTeam(match.arena(), match.arena().damageSources().magic(), 100_000, TeamColor.RED);
+		helper.assertTrue(match.chieftain(TeamColor.GREEN) == null, "Grüner Häuptling sollte gefallen sein");
+		helper.assertTrue(match.chieftainRespawnSeconds(TeamColor.GREEN) > 0, "Keine Wiederbelebungszeit für den grünen Häuptling");
+		helper.assertTrue(red.stats().heroKills == 1, "Häuptlingskill nicht gezählt");
+		helper.assertTrue(red.gold() > goldBefore, "Kein Kopfgeld für den Häuptling");
+		helper.assertTrue(red.heroXp() > xpBefore, "Keine Heldenerfahrung für den Häuptlingskill");
+		helper.assertTrue(match.useAbility(TeamColor.GREEN, AbilityType.BATTLE_SLAM) == PurchaseResult.HERO_DEAD,
+				"Fähigkeit ohne lebenden Häuptling sollte scheitern");
+	}
+
 	private static void recruitArmies(GameTestHelper helper, Match match) {
 		UnitType[] army = {UnitType.WARRIOR, UnitType.WARRIOR, UnitType.ARCHER, UnitType.SLAVE, UnitType.WARRIOR, UnitType.ARCHER,
 				UnitType.ASSASSIN, UnitType.SHAMAN, UnitType.WOLF_RIDER, UnitType.TROLL, UnitType.CATAPULT};
@@ -133,7 +186,7 @@ public class MatchGameTest {
 				PurchaseResult result = match.recruitForTest(team, type);
 				helper.assertTrue(result.ok(), "Rekrutieren von " + type + " für " + team + " fehlgeschlagen: " + result);
 			}
-			for (UnitType type : UnitType.values()) {
+			for (UnitType type : UnitType.soldiers()) {
 				helper.assertTrue(match.unitCount(team, type) > 0, "Keine Einheit vom Typ " + type + " für " + team);
 			}
 		}

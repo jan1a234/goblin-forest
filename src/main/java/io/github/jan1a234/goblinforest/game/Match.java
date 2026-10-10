@@ -6,7 +6,6 @@ import io.github.jan1a234.goblinforest.arena.ArenaBuilder;
 import io.github.jan1a234.goblinforest.arena.ArenaLayout;
 import io.github.jan1a234.goblinforest.config.Balance;
 import io.github.jan1a234.goblinforest.hero.AbilityType;
-import io.github.jan1a234.goblinforest.hero.HeroProgression;
 import io.github.jan1a234.goblinforest.net.MatchStatePayload;
 import io.github.jan1a234.goblinforest.registry.ModEntities;
 import io.github.jan1a234.goblinforest.spell.SpellType;
@@ -40,7 +39,6 @@ import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -54,9 +52,6 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
@@ -73,47 +68,45 @@ import net.minecraft.world.scores.Team;
  * Alles hier läuft ausschließlich auf dem Server-Thread.
  */
 public final class Match {
-	private static final Identifier HEALTH_MODIFIER = GoblinForest.id("hero_health");
-	private static final Identifier DAMAGE_MODIFIER = GoblinForest.id("hero_damage");
-	private static final Identifier ATTACK_SPEED_MODIFIER = GoblinForest.id("hero_attack_speed");
-	private static final Identifier KNOCKBACK_MODIFIER = GoblinForest.id("hero_knockback");
-	private static final Identifier FREEZE_MODIFIER = GoblinForest.id("freeze");
-	private static final Identifier FREEZE_JUMP_MODIFIER = GoblinForest.id("freeze_jump");
-	private static final Identifier ROOT_MODIFIER = GoblinForest.id("rooted");
-	private static final Identifier ROOT_JUMP_MODIFIER = GoblinForest.id("rooted_jump");
-	private static final Identifier RAGE_DAMAGE_MODIFIER = GoblinForest.id("rage_damage");
-	private static final Identifier RAGE_SPEED_MODIFIER = GoblinForest.id("rage_speed");
-	private static final Identifier CAMERA_MODIFIER = GoblinForest.id("camera_zoom");
-	/** Kamera-Abstand im Match: Standard 7 Blöcke (Vanilla 4), einstellbar von 3 bis 14. */
-	private static final double DEFAULT_CAMERA_OFFSET = 3.0;
-	private static final double MIN_CAMERA_OFFSET = -1.0;
-	private static final double MAX_CAMERA_OFFSET = 10.0;
-	/** Ab so vielen Ticks ohne Häuptling online verliert ein Clan kampflos. */
+	/** Ab so vielen Ticks ohne Spieler online verliert ein Clan kampflos. */
 	private static final int FORFEIT_TICKS = 20 * 120;
-	private static final int STRUCTURE_HIT_COOLDOWN = 12;
+	/** Höhe über dem Boden, auf der die (unsichtbare) Spielfigur über dem Blickpunkt der Draufsicht schwebt. */
+	private static final int COMMANDER_HEIGHT = 18;
 
-	/** Häuptling eines Clans (ein Spieler). */
+	/**
+	 * Feldherr eines Clans (ein Spieler). Er kämpft nicht selbst: Seine Spielfigur schwebt unsichtbar im Zuschauermodus
+	 * über dem Schlachtfeld, gespielt wird nur in der Draufsicht (DESIGN.md Abschnitt 10).
+	 */
 	static final class Hero {
 		final UUID uuid;
 		final String name;
 		final TeamColor team;
 		boolean prepared;
-		boolean dead;
-		int respawnTicks;
-		long lastStructureHit = -100;
-		long lastKitUse = -100;
 		long lastAttackWarning = -1000;
-		long rootedUntil = -1;
-		double cameraOffset = DEFAULT_CAMERA_OFFSET;
-		boolean raging;
-		/** Kommandoansicht: Kamera über dem Schlachtfeld, Häuptling steht still, gezielt wird auf {@link #commandFocus}. */
-		boolean commandView;
-		Vec3 commandFocus;
+		/** Blickpunkt der Draufsicht auf dem Boden; dorthin wird die Spielfigur mitgeführt. */
+		Vec3 focus;
 
 		Hero(UUID uuid, String name, TeamColor team) {
 			this.uuid = uuid;
 			this.name = name;
 			this.team = team;
+		}
+	}
+
+	/** Der Häuptling eines Clans: eine Heldeneinheit, die der Spieler aufs Schlachtfeld schickt (DESIGN.md Abschnitt 6). */
+	static final class Chieftain {
+		/** Die Einheit auf dem Feld; null, solange er tot ist oder die Runde noch nicht begonnen hat. */
+		GoblinUnit unit;
+		/** Auf dem Schlachtfeld (folgt der Haltung der Armee) oder in der Festung (bewacht das Tor)? */
+		boolean deployed;
+		/** Wurde er in dieser Runde schon einmal losgeschickt? Bis dahin zeigt das HUD einen Hinweis. */
+		boolean sentOnce;
+		/** Ticks bis zur Wiederbelebung; 0, solange er lebt. */
+		int respawnTicks;
+		boolean raging;
+
+		boolean alive() {
+			return unit != null && unit.isAlive() && !unit.isRemoved();
 		}
 	}
 
@@ -142,6 +135,7 @@ public final class Match {
 	private final EnumMap<TeamColor, Integer> offlineTicks = new EnumMap<>(TeamColor.class);
 	private final EnumMap<TeamColor, PlayerTeam> scoreboardTeams = new EnumMap<>(TeamColor.class);
 	private final Map<UUID, Hero> heroes = new LinkedHashMap<>();
+	private final EnumMap<TeamColor, Chieftain> chieftains = new EnumMap<>(TeamColor.class);
 	private final Set<GoblinUnit> units = new HashSet<>();
 	private final List<Scheduled> scheduled = new ArrayList<>();
 	private final ServerLevel arena;
@@ -173,6 +167,7 @@ public final class Match {
 			cannonCooldowns.put(team, 0);
 			lastReputation.put(team, 0);
 			offlineTicks.put(team, 0);
+			chieftains.put(team, new Chieftain());
 		}
 		players.forEach((uuid, team) -> heroes.put(uuid, new Hero(uuid, names.getOrDefault(uuid, "?"), team)));
 		if (options.ai() != null) {
@@ -290,11 +285,25 @@ public final class Match {
 		return null;
 	}
 
-	/** Kann ein Häuptling gerade angegriffen werden (lebt, ist in der Arena, kein Zuschauer)? */
-	public boolean isTargetableHero(ServerPlayer player) {
-		Hero hero = heroes.get(player.getUUID());
-		return hero != null && !hero.dead && player.isAlive() && player.level() == arena
-				&& !player.isSpectator() && !player.isCreative();
+	/** Der lebende Häuptling eines Clans oder null (tot, oder die Runde hat noch nicht begonnen). */
+	public GoblinUnit chieftain(TeamColor team) {
+		Chieftain chieftain = chieftains.get(team);
+		return chieftain.alive() ? chieftain.unit : null;
+	}
+
+	/** Ist der Häuptling auf dem Schlachtfeld (sonst bewacht er die eigene Festung)? */
+	public boolean chieftainDeployed(TeamColor team) {
+		return chieftains.get(team).deployed;
+	}
+
+	/** Sekunden bis zur Wiederbelebung des Häuptlings; 0, solange er lebt. */
+	public int chieftainRespawnSeconds(TeamColor team) {
+		return (chieftains.get(team).respawnTicks + 19) / 20;
+	}
+
+	/** Ist diese Einheit der Häuptling ihres Clans in diesem Match? */
+	public boolean isChieftain(GoblinUnit unit) {
+		return unit != null && owns(unit) && chieftains.get(unit.team()).unit == unit;
 	}
 
 	public boolean structureAlive(TeamColor team, Structure structure) {
@@ -373,6 +382,9 @@ public final class Match {
 			for (ServerPlayer player : onlineHeroes()) {
 				prepareHero(player, heroes.get(player.getUUID()));
 			}
+			for (TeamColor team : TeamColor.values()) {
+				spawnChieftain(team);
+			}
 			phase = MatchPhase.COUNTDOWN;
 			phaseTicks = balance.match().countdownSeconds() * 20;
 		}
@@ -392,7 +404,6 @@ public final class Match {
 		if (phaseTicks <= 0) {
 			phase = MatchPhase.BATTLE;
 			for (ServerPlayer player : onlineHeroes()) {
-				setFrozen(player, false);
 				title(player, Component.translatable("title.goblinforest.fight").withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
 						Component.translatable("title.goblinforest.fight_sub"), 0, 30, 15);
 				playTo(player, ModSounds.WAR_HORN, 1.0f, 1.0f);
@@ -400,15 +411,6 @@ public final class Match {
 			return;
 		}
 		phaseTicks--;
-		for (ServerPlayer player : onlineHeroes()) {
-			Hero hero = heroes.get(player.getUUID());
-			if (hero != null && hero.prepared) {
-				ArenaLayout.Point spawn = ArenaLayout.heroSpawn(hero.team);
-				if (player.position().distanceToSqr(spawn.x(), spawn.y(), spawn.z()) > 2.5) {
-					teleportToSpawn(player, hero.team);
-				}
-			}
-		}
 	}
 
 	private void tickBattle() {
@@ -418,7 +420,8 @@ public final class Match {
 		}
 		tickTowers();
 		tickCannons();
-		tickHeroes();
+		tickChieftains();
+		tickCommanders();
 		if (ai != null) {
 			ai.tick(tick);
 		}
@@ -442,16 +445,21 @@ public final class Match {
 		return options.bestOf();
 	}
 
+	/** Ist der Sudden Death in diesem Match eingeschaltet ({@code /gf start sd})? Ohne ihn gibt es kein Zeitlimit. */
+	public boolean suddenDeathEnabled() {
+		return options.suddenDeath() && balance.match().suddenDeathMinutes() > 0;
+	}
+
 	/** Sekunden bis zum Sudden Death; 0, sobald er läuft; -1, wenn er abgeschaltet ist. */
 	public long secondsUntilSuddenDeath() {
-		if (balance.match().suddenDeathMinutes() <= 0) {
+		if (!suddenDeathEnabled()) {
 			return -1;
 		}
 		return Math.max(0, (balance.match().suddenDeathTicks() - battleTicks + 19) / 20);
 	}
 
 	private void tickSuddenDeath() {
-		if (balance.match().suddenDeathMinutes() <= 0) {
+		if (!suddenDeathEnabled()) {
 			return;
 		}
 		long remaining = balance.match().suddenDeathTicks() - battleTicks;
@@ -589,8 +597,12 @@ public final class Match {
 		}
 	}
 
-	// ================================================================ Häuptlinge
+	// ================================================================ Feldherren (Spieler)
 
+	/**
+	 * Stellt einen Spieler als Feldherrn auf: Inventar gesichert, Zuschauermodus (unsichtbar, unverwundbar, ohne Kollision),
+	 * Spielfigur über dem eigenen Tor. Der Client schaltet dazu fest in die Draufsicht.
+	 */
 	private void prepareHero(ServerPlayer player, Hero hero) {
 		if (hero == null) {
 			return;
@@ -600,290 +612,267 @@ public final class Match {
 		}
 		player.closeContainer();
 		player.removeAllEffects();
-		player.setGameMode(GameType.ADVENTURE);
-		teleportToSpawn(player, hero.team);
-		applyHeroStats(player, hero.team, true);
-		applyCamera(player, hero);
-		HeroKit.apply(player, hero.team);
-		giveHeroEffects(player);
+		player.getInventory().clearContent();
+		player.setGameMode(GameType.SPECTATOR);
+		player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, -1, 0, true, false, false));
 		joinScoreboardTeam(player, hero.team);
-		feed(player);
-		updateXpBar(player, hero.team);
+		if (hero.focus == null) {
+			hero.focus = vec(ArenaLayout.overviewStart(hero.team));
+		}
+		moveCommander(player, hero, true);
 		hero.prepared = true;
-		hero.dead = false;
-		hero.commandView = false;
-		hero.commandFocus = null;
-		setFrozen(player, phase == MatchPhase.COUNTDOWN || phase == MatchPhase.SETUP);
 		player.sendSystemMessage(Component.translatable("message.goblinforest.welcome",
 				Component.translatable(hero.team.translationKey()).withColor(hero.team.rgb())).withStyle(ChatFormatting.GOLD));
 		player.sendSystemMessage(Component.translatable("message.goblinforest.controls").withStyle(ChatFormatting.GRAY));
 	}
 
-	private void giveHeroEffects(ServerPlayer player) {
-		player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, -1, 0, true, false, false));
-	}
-
-	private void feed(ServerPlayer player) {
-		// 17 Hungerpunkte: Sprinten geht, natürliche Regeneration nicht. Geheilt wird in der eigenen Festung.
-		player.getFoodData().setFoodLevel(17);
-		player.getFoodData().setSaturation(0);
-	}
-
-	private void teleportToSpawn(ServerPlayer player, TeamColor team) {
-		ArenaLayout.Point spawn = ArenaLayout.heroSpawn(team);
-		player.teleport(new TeleportTransition(arena, new Vec3(spawn.x(), spawn.y(), spawn.z()), Vec3.ZERO,
-				ArenaLayout.facingYaw(team), 0, TeleportTransition.DO_NOTHING));
-	}
-
-	private void applyHeroStats(ServerPlayer player, TeamColor team, boolean fullHeal) {
-		HeroProgression progression = teams.get(team).heroProgression();
-		int level = teams.get(team).heroLevel();
-		double oldMax = player.getMaxHealth();
-		setModifier(player, Attributes.MAX_HEALTH, HEALTH_MODIFIER, progression.maxHealth(level) - 20.0, AttributeModifier.Operation.ADD_VALUE);
-		setModifier(player, Attributes.ATTACK_DAMAGE, DAMAGE_MODIFIER, progression.damage(level) - 1.0, AttributeModifier.Operation.ADD_VALUE);
-		setModifier(player, Attributes.ATTACK_SPEED, ATTACK_SPEED_MODIFIER, -2.4, AttributeModifier.Operation.ADD_VALUE);
-		setModifier(player, Attributes.KNOCKBACK_RESISTANCE, KNOCKBACK_MODIFIER, 0.5, AttributeModifier.Operation.ADD_VALUE);
-		if (fullHeal) {
-			player.setHealth(player.getMaxHealth());
-		} else {
-			player.heal((float) Math.max(0, player.getMaxHealth() - oldMax));
+	/**
+	 * Führt die unsichtbare Spielfigur über dem Blickpunkt der Draufsicht mit, damit der Server Einheiten und Chunks
+	 * rund um den gerade betrachteten Teil des Schlachtfelds an den Client schickt.
+	 */
+	private void moveCommander(ServerPlayer player, Hero hero, boolean force) {
+		Vec3 target = new Vec3(hero.focus.x, ArenaLayout.GROUND_Y + COMMANDER_HEIGHT, hero.focus.z);
+		if (!force && player.level() == arena && player.position().distanceToSqr(target) < 16) {
+			return;
 		}
+		player.teleport(new TeleportTransition(arena, target, Vec3.ZERO, ArenaLayout.facingYaw(hero.team), 60, TeleportTransition.DO_NOTHING));
 	}
 
-	private static void setModifier(LivingEntity entity, net.minecraft.core.Holder<net.minecraft.world.entity.ai.attributes.Attribute> attribute,
-			Identifier modifierId, double value, AttributeModifier.Operation operation) {
-		AttributeInstance instance = entity.getAttribute(attribute);
-		if (instance != null) {
-			instance.addOrUpdateTransientModifier(new AttributeModifier(modifierId, value, operation));
+	/** Hält die Feldherren im Zuschauermodus und in der Arena (z. B. nach /gamemode oder einem Portal). */
+	private void tickCommanders() {
+		if (tick % 20 != 0) {
+			return;
 		}
-	}
-
-	private static void removeModifier(LivingEntity entity, net.minecraft.core.Holder<net.minecraft.world.entity.ai.attributes.Attribute> attribute,
-			Identifier modifierId) {
-		AttributeInstance instance = entity.getAttribute(attribute);
-		if (instance != null) {
-			instance.removeModifier(modifierId);
+		for (ServerPlayer player : onlineHeroes()) {
+			Hero hero = heroes.get(player.getUUID());
+			if (!hero.prepared) {
+				continue;
+			}
+			if (!player.isSpectator()) {
+				player.setGameMode(GameType.SPECTATOR);
+			}
+			if (player.level() != arena) {
+				moveCommander(player, hero, true);
+			}
 		}
-	}
-
-	private void setFrozen(ServerPlayer player, boolean frozen) {
-		if (frozen) {
-			setModifier(player, Attributes.MOVEMENT_SPEED, FREEZE_MODIFIER, -1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-			setModifier(player, Attributes.JUMP_STRENGTH, FREEZE_JUMP_MODIFIER, -1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-		} else {
-			removeModifier(player, Attributes.MOVEMENT_SPEED, FREEZE_MODIFIER);
-			removeModifier(player, Attributes.JUMP_STRENGTH, FREEZE_JUMP_MODIFIER);
-		}
-	}
-
-	private void updateXpBar(ServerPlayer player, TeamColor team) {
-		TeamState state = teams.get(team);
-		player.experienceLevel = state.heroLevel();
-		player.experienceProgress = (float) state.heroProgression().progressToNext(state.heroXp());
-		// Eine sich ändernde Gesamtzahl löst das Senden an den Client aus.
-		player.totalExperience = (int) Math.round(state.heroXp() * 10) + state.heroLevel();
 	}
 
 	private void restoreHero(ServerPlayer player) {
-		clearHeroEffects(player);
-		setFrozen(player, false);
+		player.removeAllEffects();
 		server.getScoreboard().removePlayerFromTeam(player.getScoreboardName());
 		player.closeContainer();
 		PlayerBackup.restore(player);
 		ServerPlayNetworking.send(player, MatchStatePayload.none());
 	}
 
-	/** Entfernt alle Match-Modifikatoren und Effekte vom Spieler. */
-	private void clearHeroEffects(ServerPlayer player) {
-		removeModifier(player, Attributes.MAX_HEALTH, HEALTH_MODIFIER);
-		removeModifier(player, Attributes.ATTACK_DAMAGE, DAMAGE_MODIFIER);
-		removeModifier(player, Attributes.ATTACK_SPEED, ATTACK_SPEED_MODIFIER);
-		removeModifier(player, Attributes.KNOCKBACK_RESISTANCE, KNOCKBACK_MODIFIER);
-		removeModifier(player, Attributes.MOVEMENT_SPEED, ROOT_MODIFIER);
-		removeModifier(player, Attributes.JUMP_STRENGTH, ROOT_JUMP_MODIFIER);
-		removeModifier(player, Attributes.ATTACK_DAMAGE, RAGE_DAMAGE_MODIFIER);
-		removeModifier(player, Attributes.MOVEMENT_SPEED, RAGE_SPEED_MODIFIER);
-		removeModifier(player, Attributes.CAMERA_DISTANCE, CAMERA_MODIFIER);
-		player.removeAllEffects();
-	}
-
-	private void tickHeroes() {
-		for (ServerPlayer player : onlineHeroes()) {
-			Hero hero = heroes.get(player.getUUID());
-			if (!hero.prepared) {
-				continue;
-			}
-			if (hero.dead) {
-				if (hero.respawnTicks % 20 == 0 && hero.respawnTicks > 0) {
-					player.sendOverlayMessage(Component.translatable("message.goblinforest.respawn_in", hero.respawnTicks / 20).withStyle(ChatFormatting.GRAY));
-				}
-				if (--hero.respawnTicks <= 0) {
-					respawnHero(player, hero);
-				}
-				continue;
-			}
-			if (tick % 10 == 0) {
-				HeroKit.enforce(player, hero.team);
-			}
-			tickRage(player, hero);
-			if (hero.rootedUntil >= 0 && tick >= hero.rootedUntil) {
-				clearRoot(player, hero);
-			} else if (hero.rootedUntil >= 0 && tick % 8 == 0) {
-				arena.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.ROOTED_DIRT.defaultBlockState()),
-						player.getX(), player.getY() + 0.2, player.getZ(), 6, 0.3, 0.1, 0.3, 0.05);
-			}
-			if (tick % 20 == 0) {
-				feed(player);
-				ArenaLayout.Box zone = ArenaLayout.healZone(hero.team);
-				BlockPos pos = player.blockPosition();
-				if (zone.contains(pos.getX(), pos.getY(), pos.getZ()) && player.getHealth() < player.getMaxHealth()) {
-					player.heal(player.getMaxHealth() * 0.03f);
-					arena.sendParticles(ParticleTypes.HEART, player.getX(), player.getY() + 2.2, player.getZ(), 1, 0.2, 0.1, 0.2, 0);
-				}
-				if (!ArenaLayout.insideArena(player.getX(), player.getZ()) || player.getY() < ArenaLayout.GROUND_Y - 8
-						|| player.level() != arena) {
-					teleportToSpawn(player, hero.team);
-				}
-			}
-		}
-	}
-
-	private void respawnHero(ServerPlayer player, Hero hero) {
-		hero.dead = false;
-		player.setGameMode(GameType.ADVENTURE);
-		teleportToSpawn(player, hero.team);
-		applyHeroStats(player, hero.team, true);
-		HeroKit.enforce(player, hero.team);
-		giveHeroEffects(player);
-		feed(player);
-		title(player, Component.translatable("title.goblinforest.respawned").withStyle(ChatFormatting.GREEN), Component.empty(), 5, 30, 10);
-		arena.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1, player.getZ(), 30, 0.4, 0.8, 0.4, 0.3);
-	}
-
-	private void addHeroXp(TeamColor team, double amount) {
-		TeamState state = teams.get(team);
-		boolean levelUp = state.addHeroXp(amount);
-		for (ServerPlayer player : onlineHeroes(team)) {
-			if (levelUp) {
-				applyHeroStats(player, team, false);
-				title(player, Component.translatable("title.goblinforest.hero_level", state.heroLevel()).withStyle(ChatFormatting.GOLD),
-						Component.translatable("title.goblinforest.hero_level_sub",
-								(int) state.heroProgression().maxHealth(state.heroLevel()),
-								(int) state.heroProgression().damage(state.heroLevel())), 5, 40, 10);
-				playTo(player, SoundEvents.PLAYER_LEVELUP, 1.0f, 0.8f);
-				arena.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, player.getX(), player.getY() + 1, player.getZ(), 40, 0.4, 1.0, 0.4, 0.4);
-			}
-			updateXpBar(player, team);
-		}
-	}
-
-	/** Häuptling stirbt: statt echtem Tod Zuschauermodus bis zur Wiederbelebung. Gibt false zurück (Tod abbrechen). */
+	/** Feldherren sterben nicht (Zuschauermodus); nur zur Sicherheit, falls doch Schaden durchkommt (z. B. /kill). */
 	public boolean onHeroDeath(ServerPlayer player, DamageSource source) {
-		Hero hero = heroes.get(player.getUUID());
-		if (hero == null) {
-			return true;
-		}
 		player.setHealth(player.getMaxHealth());
 		player.clearFire();
-		if (phase != MatchPhase.BATTLE || hero.dead) {
-			return false;
-		}
-		leaveCommandView(player, hero);
-		TeamColor enemy = hero.team.opponent();
-		teams.get(hero.team).stats().heroDeaths++;
-		teams.get(enemy).stats().heroKills++;
-		teams.get(enemy).addGold(bounty.heroKillBounty());
-		teams.get(enemy).addClanXp(bounty.heroKillClanXp());
-		Entity killer = source.getEntity();
-		boolean byHero = killer instanceof ServerPlayer;
-		addHeroXp(enemy, byHero ? bounty.heroKillClanXp() : bounty.heroKillClanXp() * teams.get(enemy).heroProgression().armyXpShare());
-		if (killer instanceof GoblinUnit unit && owns(unit)) {
-			unit.addXp(combat.leveling().xpForKill() * 3);
-			unit.onKilledEnemy(arena, this);
-		}
-		if (hero.raging) {
-			endRage(player, hero);
-		}
-		clearRoot(player, hero);
-		arena.sendParticles(ParticleTypes.SOUL, player.getX(), player.getY() + 1, player.getZ(), 30, 0.4, 0.8, 0.4, 0.05);
-		arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WITHER_SPAWN, SoundSource.PLAYERS, 0.4f, 1.6f);
-		hero.dead = true;
-		int level = teams.get(hero.team).heroLevel();
-		hero.respawnTicks = teams.get(hero.team).heroProgression().respawnSeconds(level) * 20;
-		player.removeAllEffects();
-		giveHeroEffects(player);
-		player.setGameMode(GameType.SPECTATOR);
-		title(player, Component.translatable("title.goblinforest.died").withStyle(ChatFormatting.DARK_RED),
-				Component.translatable("title.goblinforest.died_sub", hero.respawnTicks / 20), 5, 50, 10);
-		broadcast(Component.translatable("message.goblinforest.hero_killed",
-				Component.literal(hero.name).withColor(hero.team.rgb()),
-				bounty.heroKillBounty(),
-				Component.translatable(enemy.translationKey()).withColor(enemy.rgb())));
-		for (ServerPlayer other : onlineHeroes()) {
-			Hero otherHero = heroes.get(other.getUUID());
-			if (otherHero != null && otherHero.team == enemy) {
-				playTo(other, ModSounds.COINS, 0.9f, 0.8f);
-			}
-		}
 		return false;
 	}
 
-	/** Darf ein Häuptling gerade Schaden nehmen? Kein Schaden außerhalb des Kampfes und durch Verbündete. */
+	/** Feldherren nehmen im Match keinen Schaden. */
 	public boolean allowHeroDamage(ServerPlayer player, DamageSource source) {
-		Hero hero = heroes.get(player.getUUID());
-		if (hero == null) {
-			return true;
-		}
-		if (phase != MatchPhase.BATTLE || hero.dead) {
-			return false;
-		}
-		TeamColor attacker = teamOf(source.getEntity());
-		return attacker != hero.team;
-	}
-
-	/** Nach erlittenem Schaden: lädt die Raserei des Opfers; ein angreifender Häuptling bekommt Ladung bzw. Lebensraub. */
-	public void onHeroDamaged(ServerPlayer player, DamageSource source, float amount) {
-		Hero hero = heroes.get(player.getUUID());
-		if (hero == null || hero.dead || phase != MatchPhase.BATTLE || amount <= 0) {
-			return;
-		}
-		if (!teams.get(hero.team).rageActive(tick)) {
-			onHeroTookDamage(player, hero, amount);
-		}
-		if (source.getEntity() instanceof ServerPlayer attacker && attacker != player) {
-			onHeroDealtDamage(attacker, amount);
-		}
-	}
-
-	/** Kamera-Abstand der Verfolgerperspektive über das Vanilla-Attribut (kein Client-Eingriff nötig). */
-	private static void applyCamera(ServerPlayer player, Hero hero) {
-		setModifier(player, Attributes.CAMERA_DISTANCE, CAMERA_MODIFIER, hero.cameraOffset, AttributeModifier.Operation.ADD_VALUE);
-	}
-
-	private void clearRoot(ServerPlayer player, Hero hero) {
-		hero.rootedUntil = -1;
-		removeModifier(player, Attributes.MOVEMENT_SPEED, ROOT_MODIFIER);
-		removeModifier(player, Attributes.JUMP_STRENGTH, ROOT_JUMP_MODIFIER);
+		return !heroes.containsKey(player.getUUID());
 	}
 
 	public void onPlayerJoin(ServerPlayer player) {
 		Hero hero = heroes.get(player.getUUID());
-		if (hero == null) {
-			return;
-		}
-		if (phase == MatchPhase.SETUP) {
+		if (hero == null || phase == MatchPhase.SETUP) {
 			return;
 		}
 		if (phase == MatchPhase.ENDED) {
 			restoreHero(player);
 			return;
 		}
-		boolean wasDead = hero.dead;
 		prepareHero(player, hero);
-		if (wasDead) {
-			hero.dead = true;
-			player.setGameMode(GameType.SPECTATOR);
+	}
+
+	// ================================================================ Häuptlinge
+
+	/** Stellt den Häuptling eines Clans an seinem Posten in der Festung auf (Rundenbeginn und Wiederbelebung). */
+	private void spawnChieftain(TeamColor team) {
+		Chieftain chieftain = chieftains.get(team);
+		if (chieftain.alive()) {
+			return;
 		}
+		GoblinUnit unit = ModEntities.GOBLIN.create(arena, EntitySpawnReason.MOB_SUMMONED);
+		if (unit == null) {
+			return;
+		}
+		ArenaLayout.Point post = ArenaLayout.heroSpawn(team);
+		unit.snapTo(post.x(), post.y(), post.z(), ArenaLayout.facingYaw(team), 0);
+		unit.setYHeadRot(ArenaLayout.facingYaw(team));
+		chieftain.unit = unit;
+		chieftain.respawnTicks = 0;
+		chieftain.raging = false;
+		unit.setup(UnitType.CHIEFTAIN, team, this);
+		if (!arena.addFreshEntity(unit)) {
+			chieftain.unit = null;
+			return;
+		}
+		joinScoreboardTeam(unit, team);
+		arena.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, post.x(), post.y() + 1, post.z(), 30, 0.4, 0.8, 0.4, 0.3);
+	}
+
+	/**
+	 * Schickt den Häuptling aufs Schlachtfeld oder ruft ihn in die Festung zurück ({@code send} null = umschalten).
+	 * Ist er gerade tot, gilt der Befehl für die Zeit nach der Wiederbelebung.
+	 */
+	public void commandChieftain(TeamColor team, Boolean send) {
+		if (phase == MatchPhase.SETUP || phase == MatchPhase.ENDED) {
+			return;
+		}
+		Chieftain chieftain = chieftains.get(team);
+		boolean deploy = send == null ? !chieftain.deployed : send;
+		if (deploy == chieftain.deployed) {
+			return;
+		}
+		chieftain.deployed = deploy;
+		chieftain.sentOnce |= deploy;
+		GoblinUnit unit = chieftain(team);
+		if (unit != null) {
+			unit.onOrdersChanged();
+			arena.playSound(null, unit.getX(), unit.getY(), unit.getZ(), ModSounds.WAR_HORN, SoundSource.HOSTILE, 1.0f, deploy ? 1.1f : 0.8f);
+		}
+		String key = !deploy ? "message.goblinforest.chieftain_recalled"
+				: unit == null ? "message.goblinforest.chieftain_sent_later" : "message.goblinforest.chieftain_sent";
+		for (ServerPlayer player : onlineHeroes(team)) {
+			player.sendOverlayMessage(Component.translatable(key).withStyle(deploy ? ChatFormatting.GOLD : ChatFormatting.AQUA));
+			if (unit == null) {
+				playTo(player, SoundEvents.UI_BUTTON_CLICK.value(), 0.6f, 1.0f);
+			}
+		}
+	}
+
+	private void tickChieftains() {
+		for (TeamColor team : TeamColor.values()) {
+			Chieftain chieftain = chieftains.get(team);
+			if (chieftain.unit != null && chieftain.unit.isRemoved() && chieftain.respawnTicks <= 0) {
+				// Ohne Todesereignis verschwunden (z. B. durch einen Befehl): wie ein Tod ohne Kopfgeld behandeln.
+				chieftain.unit = null;
+				chieftain.respawnTicks = respawnTicks(team);
+			}
+			if (chieftain.unit == null && chieftain.respawnTicks > 0 && --chieftain.respawnTicks == 0) {
+				spawnChieftain(team);
+				for (ServerPlayer player : onlineHeroes(team)) {
+					player.sendOverlayMessage(Component.translatable(chieftain.deployed ? "message.goblinforest.chieftain_back_marching"
+							: "message.goblinforest.chieftain_back").withStyle(ChatFormatting.GREEN));
+					playTo(player, SoundEvents.PLAYER_LEVELUP, 0.6f, 1.2f);
+				}
+			}
+			tickRage(team, chieftain);
+		}
+	}
+
+	private int respawnTicks(TeamColor team) {
+		TeamState state = teams.get(team);
+		return state.heroProgression().respawnSeconds(state.heroLevel()) * 20;
+	}
+
+	/** Der Häuptling ist gefallen: Kopfgeld und Erfahrung für den Gegner, Wiederbelebung nach einer Wartezeit. */
+	private void onChieftainKilled(GoblinUnit unit, Entity killer, TeamColor killerTeam) {
+		TeamColor team = unit.team();
+		Chieftain chieftain = chieftains.get(team);
+		server.getScoreboard().removePlayerFromTeam(unit.getScoreboardName());
+		if (chieftain.unit == unit) {
+			chieftain.unit = null;
+		}
+		if (chieftain.raging) {
+			endRage(team);
+		}
+		if (phase != MatchPhase.BATTLE) {
+			return;
+		}
+		chieftain.respawnTicks = respawnTicks(team);
+		TeamColor enemy = team.opponent();
+		teams.get(team).stats().heroDeaths++;
+		TeamState enemyState = teams.get(enemy);
+		enemyState.stats().heroKills++;
+		enemyState.addGold(bounty.heroKillBounty());
+		enemyState.addClanXp(bounty.heroKillClanXp());
+		boolean byChieftain = killer instanceof GoblinUnit killerUnit && isChieftain(killerUnit);
+		addHeroXp(enemy, byChieftain ? bounty.heroKillClanXp() : bounty.heroKillClanXp() * enemyState.heroProgression().armyXpShare());
+		if (killer instanceof GoblinUnit killerUnit && owns(killerUnit) && !byChieftain) {
+			killerUnit.addXp(combat.leveling().xpForKill() * 3);
+			killerUnit.onKilledEnemy(arena, this);
+		}
+		arena.sendParticles(ParticleTypes.SOUL, unit.getX(), unit.getY() + 1, unit.getZ(), 30, 0.4, 0.8, 0.4, 0.05);
+		arena.playSound(null, unit.getX(), unit.getY(), unit.getZ(), SoundEvents.WITHER_SPAWN, SoundSource.HOSTILE, 0.5f, 1.6f);
+		Component who = Component.translatable("message.goblinforest.chieftain_of",
+				Component.translatable(team.translationKey()).withColor(team.rgb()));
+		broadcast(Component.translatable("message.goblinforest.hero_killed", who, bounty.heroKillBounty(),
+				Component.translatable(enemy.translationKey()).withColor(enemy.rgb())));
+		for (ServerPlayer player : onlineHeroes(team)) {
+			title(player, Component.translatable("title.goblinforest.died").withStyle(ChatFormatting.DARK_RED),
+					Component.translatable("title.goblinforest.died_sub", chieftain.respawnTicks / 20), 5, 50, 10);
+		}
+		for (ServerPlayer player : onlineHeroes(enemy)) {
+			playTo(player, ModSounds.COINS, 0.9f, 0.8f);
+		}
+	}
+
+	private void addHeroXp(TeamColor team, double amount) {
+		TeamState state = teams.get(team);
+		if (!state.addHeroXp(amount)) {
+			return;
+		}
+		GoblinUnit unit = chieftain(team);
+		if (unit != null) {
+			unit.refreshChieftain(true);
+			arena.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, unit.getX(), unit.getY() + 1, unit.getZ(), 40, 0.4, 1.0, 0.4, 0.4);
+			arena.playSound(null, unit.getX(), unit.getY(), unit.getZ(), SoundEvents.PLAYER_LEVELUP, SoundSource.HOSTILE, 1.0f, 0.8f);
+		}
+		for (ServerPlayer player : onlineHeroes(team)) {
+			title(player, Component.translatable("title.goblinforest.hero_level", state.heroLevel()).withStyle(ChatFormatting.GOLD),
+					Component.translatable("title.goblinforest.hero_level_sub",
+							(int) state.heroProgression().maxHealth(state.heroLevel()),
+							(int) state.heroProgression().damage(state.heroLevel())), 5, 40, 10);
+			playTo(player, SoundEvents.PLAYER_LEVELUP, 1.0f, 0.8f);
+		}
+	}
+
+	/** Schaden, den der Häuptling austeilt, ohne Rüstung und Raserei: Heldenlevel. Raserei-Faktor kommt dazu. */
+	public double chieftainDamage(TeamColor team) {
+		TeamState state = teams.get(team);
+		return state.heroProgression().damage(state.heroLevel()) * state.heroDamageMultiplier(tick);
+	}
+
+	/** Lebenspunkte des Häuptlings auf dem aktuellen Heldenlevel. */
+	public double chieftainMaxHealth(TeamColor team) {
+		TeamState state = teams.get(team);
+		return state.heroProgression().maxHealth(state.heroLevel());
+	}
+
+	/** Tempofaktor des Häuptlings (Raserei macht schneller). */
+	public double chieftainSpeedMultiplier(TeamColor team) {
+		return chieftains.get(team).raging ? 1.0 + balance.rage().speedBonus() : 1.0;
+	}
+
+	/** Der Häuptling hat Schaden ausgeteilt: Raserei laden, während der Raserei Lebensraub. */
+	public void onChieftainDealtDamage(GoblinUnit unit, double amount) {
+		if (!isChieftain(unit) || phase != MatchPhase.BATTLE || amount <= 0) {
+			return;
+		}
+		TeamState state = teams.get(unit.team());
+		if (state.rageActive(tick)) {
+			float heal = (float) (amount * state.rageLifesteal());
+			if (heal > 0 && unit.getHealth() < unit.getMaxHealth()) {
+				unit.heal(heal);
+				arena.sendParticles(new DustParticleOptions(0x9C0A0A, 1.0f), unit.getX(), unit.getY() + 1.2, unit.getZ(), 4, 0.3, 0.4, 0.3, 0);
+			}
+		} else {
+			addRage(unit.team(), amount * balance.rage().chargePerDamageDealt());
+		}
+	}
+
+	/** Der Häuptling hat Schaden eingesteckt: lädt die Raserei. */
+	public void onChieftainDamaged(GoblinUnit unit, double amount) {
+		if (!isChieftain(unit) || phase != MatchPhase.BATTLE || amount <= 0 || teams.get(unit.team()).rageActive(tick)) {
+			return;
+		}
+		addRage(unit.team(), amount * balance.rage().chargePerDamageTaken());
 	}
 
 	// ================================================================ Einheiten
@@ -928,6 +917,10 @@ public final class Match {
 	}
 
 	public void onUnitKilled(GoblinUnit unit, Entity killer, TeamColor killerTeam) {
+		if (unit.unitType() == UnitType.CHIEFTAIN) {
+			onChieftainKilled(unit, killer, killerTeam);
+			return;
+		}
 		units.remove(unit);
 		server.getScoreboard().removePlayerFromTeam(unit.getScoreboardName());
 		TeamColor owner = unit.team();
@@ -945,9 +938,9 @@ public final class Match {
 			state.stats().unitKills++;
 			double clanXp = bounty.clanXpForKill(stats, level);
 			state.addClanXp(clanXp);
-			boolean byHero = killer instanceof ServerPlayer;
-			addHeroXp(enemy, byHero ? clanXp : clanXp * state.heroProgression().armyXpShare());
-			if (killer instanceof GoblinUnit killerUnit && owns(killerUnit)) {
+			boolean byChieftain = killer instanceof GoblinUnit killerUnit && isChieftain(killerUnit);
+			addHeroXp(enemy, byChieftain ? clanXp : clanXp * state.heroProgression().armyXpShare());
+			if (killer instanceof GoblinUnit killerUnit && owns(killerUnit) && !byChieftain) {
 				killerUnit.addXp(combat.leveling().xpForKill());
 				killerUnit.onKilledEnemy(arena, this);
 			}
@@ -1003,7 +996,7 @@ public final class Match {
 
 	private List<Component> unlockedAt(TeamColor team, int reputation) {
 		List<Component> list = new ArrayList<>();
-		for (UnitType type : UnitType.values()) {
+		for (UnitType type : UnitType.soldiers()) {
 			if (balance.unit(type).unlockReputation() == reputation) {
 				list.add(Component.translatable(type.translationKey()));
 			}
@@ -1142,27 +1135,15 @@ public final class Match {
 		return hits;
 	}
 
-	/** Gegner, den Flächenschaden treffen darf: feindliche Einheiten (auch getarnt) und angreifbare feindliche Häuptlinge. */
+	/** Gegner, den Flächenschaden treffen darf: feindliche Einheiten (auch getarnt) einschließlich des Häuptlings. */
 	private boolean isDamageableEnemy(TeamColor team, LivingEntity entity) {
-		if (!entity.isAlive()) {
-			return false;
-		}
-		if (entity instanceof GoblinUnit unit) {
-			return owns(unit) && unit.team() != team;
-		}
-		if (entity instanceof ServerPlayer player) {
-			return teamOf(player.getUUID()) == team.opponent() && isTargetableHero(player);
-		}
-		return false;
+		return entity.isAlive() && entity instanceof GoblinUnit unit && owns(unit) && unit.team() != team;
 	}
 
-	/** Schaden im Namen eines Clans: Einheiten merken sich den Clan für Kopfgeld, Häuptlinge ohne Unverwundbarkeitspause. */
+	/** Schaden im Namen eines Clans: Einheiten merken sich den Clan für Kopfgeld. */
 	private void hurtAsTeam(LivingEntity entity, DamageSource source, double damage, TeamColor team) {
 		if (entity instanceof GoblinUnit unit) {
 			unit.hurtByTeam(arena, source, (float) damage, team);
-		} else {
-			entity.invulnerableTime = 0;
-			entity.hurtServer(arena, source, (float) damage);
 		}
 	}
 
@@ -1180,16 +1161,7 @@ public final class Match {
 	}
 
 	private boolean isEnemyOf(TeamColor team, LivingEntity entity) {
-		if (!entity.isAlive()) {
-			return false;
-		}
-		if (entity instanceof GoblinUnit unit) {
-			return owns(unit) && unit.team() != team && !unit.isStealthed();
-		}
-		if (entity instanceof ServerPlayer player) {
-			return teamOf(player.getUUID()) == team.opponent() && isTargetableHero(player);
-		}
-		return false;
+		return entity.isAlive() && entity instanceof GoblinUnit unit && owns(unit) && unit.team() != team && !unit.isStealthed();
 	}
 
 	private void fireTower(TeamColor team, ArenaLayout.Point muzzle, LivingEntity target, double damage) {
@@ -1205,15 +1177,10 @@ public final class Match {
 		}
 		arena.playSound(null, muzzle.x(), muzzle.y(), muzzle.z(), SoundEvents.ARROW_SHOOT, SoundSource.BLOCKS, 1.0f, 0.7f);
 		arena.playSound(null, to.x, to.y, to.z, SoundEvents.ARROW_HIT, SoundSource.BLOCKS, 0.8f, 1.0f);
-		if (target instanceof GoblinUnit unit) {
-			unit.hurtByTeam(arena, arena.damageSources().magic(), (float) damage, team);
-		} else {
-			target.invulnerableTime = 0;
-			target.hurtServer(arena, arena.damageSources().magic(), (float) damage);
-		}
+		hurtAsTeam(target, arena.damageSources().magic(), damage, team);
 	}
 
-	/** Schaden an Turm oder Festungskern, z. B. durch Einheiten oder den Häuptling. */
+	/** Schaden an Turm oder Festungskern, z. B. durch Einheiten, den Häuptling oder einen Meteor. */
 	public void damageStructure(TeamColor target, Structure structure, double amount, Entity attacker, TeamColor attackerTeam) {
 		if (phase != MatchPhase.BATTLE || target == attackerTeam || amount <= 0) {
 			return;
@@ -1315,11 +1282,20 @@ public final class Match {
 
 	// ================================================================ Aktionen der Spieler
 
-	/** Aktion aus dem Netzwerk (Kriegsmenü, Schnelltasten) oder aus der Hotbar. */
+	/**
+	 * Aktion aus dem Netzwerk (Leiste, Kriegsmenü, Schnelltasten). Gezielte Aktionen tragen den Zielpunkt am Ende,
+	 * z. B. {@code cast:fireball@12.50:-3.00} oder {@code rally@-40.00:2.00}.
+	 */
 	public void handleAction(ServerPlayer player, String action) {
 		Hero hero = heroes.get(player.getUUID());
 		if (hero == null || !hero.prepared || phase == MatchPhase.SETUP || phase == MatchPhase.ENDED) {
 			return;
+		}
+		Vec3 point = null;
+		int at = action.indexOf('@');
+		if (at >= 0) {
+			point = parsePoint(action.substring(at + 1));
+			action = action.substring(0, at);
 		}
 		String[] parts = action.split(":", 2);
 		String verb = parts[0];
@@ -1357,24 +1333,36 @@ public final class Match {
 			}
 			case "cast" -> {
 				SpellType spell = SpellType.byId(arg);
-				if (spell != null) {
-					castSpell(player, hero, spell);
+				if (spell != null && phase == MatchPhase.BATTLE) {
+					PurchaseResult result = castSpellFor(hero.team, spell, groundTarget(point != null ? point : hero.focus), player);
+					if (!result.ok()) {
+						feedback(player, result, Component.empty());
+					}
 				}
 			}
 			case "ability" -> {
 				AbilityType ability = AbilityType.byId(arg);
 				if (ability != null) {
-					useAbility(player, hero, ability);
+					PurchaseResult result = useAbility(hero.team, ability);
+					if (!result.ok()) {
+						feedback(player, result, Component.empty());
+					}
 				}
 			}
+			case "chieftain" -> commandChieftain(hero.team, switch (arg) {
+				case "send" -> Boolean.TRUE;
+				case "recall" -> Boolean.FALSE;
+				default -> null;
+			});
 			case "ability_rank" -> {
 				AbilityType ability = AbilityType.byId(arg);
 				if (ability != null) {
 					PurchaseResult result = state.buyAbilityRank(ability);
 					feedback(player, result, Component.translatable("message.goblinforest.ability_ranked",
 							Component.translatable(ability.translationKey()), state.abilityRank(ability)));
-					if (result.ok() && ability == AbilityType.RAGE && hero.raging) {
-						applyRageModifiers(player, hero.team);
+					GoblinUnit unit = chieftain(hero.team);
+					if (result.ok() && ability == AbilityType.RAGE && unit != null) {
+						unit.refreshChieftain(false);
 					}
 				}
 			}
@@ -1389,42 +1377,18 @@ public final class Match {
 					setStance(hero.team, stance);
 				}
 			}
-			case "rally" -> setRally(player, hero);
-			case "zoom" -> {
-				hero.cameraOffset = Math.clamp(hero.cameraOffset + ("in".equals(arg) ? -1.0 : 1.0), MIN_CAMERA_OFFSET, MAX_CAMERA_OFFSET);
-				applyCamera(player, hero);
-			}
-			case "hit_structure" -> heroStructureHit(player, hero);
-			case "command_view" -> {
-				if ("on".equals(arg)) {
-					enterCommandView(player, hero);
-				} else {
-					leaveCommandView(player, hero);
+			case "rally" -> setRally(player, hero.team, point != null ? point : hero.focus);
+			case "focus" -> {
+				Vec3 focus = parsePoint(arg);
+				if (focus != null) {
+					hero.focus = focus;
+					moveCommander(player, hero, false);
 				}
-				ServerPlayNetworking.send(player, snapshot(hero));
 			}
-			case "command_focus" -> setCommandFocus(hero, arg);
 			case "menu" -> ServerPlayNetworking.send(player, io.github.jan1a234.goblinforest.net.OpenMenuPayload.INSTANCE);
 			default -> {
 			}
 		}
-	}
-
-	/** Rechtsklick mit einem Ausrüstungsgegenstand. Gibt true zurück, wenn er zur Ausrüstung gehört. */
-	public boolean handleKitUse(ServerPlayer player, String kitId) {
-		Hero hero = heroes.get(player.getUUID());
-		if (hero == null) {
-			return false;
-		}
-		if (tick - hero.lastKitUse < 4) {
-			return true;
-		}
-		hero.lastKitUse = tick;
-		HeroKit.Slot slot = HeroKit.Slot.byId(kitId);
-		if (slot != null && !slot.action().isEmpty()) {
-			handleAction(player, slot.action());
-		}
-		return true;
 	}
 
 	/** Gekaufte Verbesserung sofort sichtbar machen: Ausdauer wirkt auf lebende Einheiten, Kanone und Goldmine werden gebaut. */
@@ -1516,19 +1480,19 @@ public final class Match {
 		}
 	}
 
-	private void setRally(ServerPlayer player, Hero hero) {
-		if (phase != MatchPhase.BATTLE || hero.dead) {
+	/** Sammelpunkt setzen: die Armee hält dort ihre Stellung. */
+	private void setRally(ServerPlayer player, TeamColor team, Vec3 target) {
+		if (phase != MatchPhase.BATTLE || target == null) {
 			return;
 		}
-		Vec3 target = aimPoint(player, 40);
-		BlockPos ground = BlockPos.containing(target.x, target.y, target.z);
-		Vec3 point = new Vec3(ground.getX() + 0.5, ArenaLayout.GROUND_Y + 1, ground.getZ() + 0.5);
+		Vec3 point = new Vec3(Mth.floor(target.x) + 0.5, ArenaLayout.GROUND_Y + 1, Mth.floor(target.z) + 0.5);
 		if (!ArenaLayout.insideArena(point.x, point.z)) {
 			return;
 		}
-		rallyPoints.put(hero.team, point);
-		setStance(hero.team, Stance.HOLD);
-		arena.playSound(null, player.getX(), player.getY(), player.getZ(), ModSounds.WAR_HORN, SoundSource.PLAYERS, 0.7f, 1.25f);
+		rallyPoints.put(team, point);
+		setStance(team, Stance.HOLD);
+		arena.playSound(null, point.x, point.y, point.z, ModSounds.WAR_HORN, SoundSource.PLAYERS, 0.7f, 1.25f);
+		playTo(player, ModSounds.WAR_HORN, 0.5f, 1.25f);
 	}
 
 	private void drawRallyMarkers() {
@@ -1540,76 +1504,22 @@ public final class Match {
 		});
 	}
 
-	private void heroStructureHit(ServerPlayer player, Hero hero) {
-		if (phase != MatchPhase.BATTLE || hero.dead || tick - hero.lastStructureHit < STRUCTURE_HIT_COOLDOWN) {
-			return;
-		}
-		net.minecraft.world.phys.HitResult hit = player.pick(5.0, 1.0f, false);
-		if (!(hit instanceof net.minecraft.world.phys.BlockHitResult blockHit) || hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK) {
-			return;
-		}
-		BlockPos pos = blockHit.getBlockPos();
-		TeamColor enemy = hero.team.opponent();
-		Structure structure = null;
-		if (expanded(ArenaLayout.towerBox(enemy)).contains(pos.getX(), pos.getY(), pos.getZ()) && teams.get(enemy).towerAlive()) {
-			structure = Structure.TOWER;
-		} else if (expanded(ArenaLayout.coreBox(enemy)).contains(pos.getX(), pos.getY(), pos.getZ())) {
-			structure = Structure.CORE;
-		}
-		if (structure == null) {
-			return;
-		}
-		hero.lastStructureHit = tick;
-		TeamState state = teams.get(hero.team);
-		double damage = state.heroProgression().damage(state.heroLevel()) * state.heroDamageMultiplier(tick);
-		Vec3 location = hit.getLocation();
-		arena.sendParticles(ParticleTypes.CRIT, location.x, location.y, location.z, 8, 0.2, 0.2, 0.2, 0.2);
-		arena.playSound(null, location.x, location.y, location.z, SoundEvents.ZOMBIE_ATTACK_WOODEN_DOOR, SoundSource.PLAYERS, 0.5f, 1.2f);
-		damageStructure(enemy, structure, damage, player, hero.team);
-	}
-
-	private static ArenaLayout.Box expanded(ArenaLayout.Box box) {
-		return new ArenaLayout.Box(box.minX() - 1, box.minY(), box.minZ() - 1, box.maxX() + 1, box.maxY() + 4, box.maxZ() + 1);
-	}
-
-	/** Punkt, auf den der Spieler zielt: erster Block oder erstes Lebewesen auf der Blicklinie. */
-	private void enterCommandView(ServerPlayer player, Hero hero) {
-		if (phase != MatchPhase.BATTLE || hero.dead || hero.commandView) {
-			return;
-		}
-		hero.commandView = true;
-		hero.commandFocus = new Vec3(player.getX(), ArenaLayout.GROUND_Y + 1, player.getZ());
-		setFrozen(player, true);
-	}
-
-	private void leaveCommandView(ServerPlayer player, Hero hero) {
-		if (!hero.commandView) {
-			return;
-		}
-		hero.commandView = false;
-		hero.commandFocus = null;
-		if (phase == MatchPhase.BATTLE) {
-			setFrozen(player, false);
-		}
-	}
-
-	/** Der Client meldet, worauf die Kommandoansicht gerade blickt ("x:z"). */
-	private void setCommandFocus(Hero hero, String arg) {
-		if (!hero.commandView) {
-			return;
-		}
-		String[] xz = arg.split(":");
+	/** Liest einen Punkt "x:z" vom Client; null bei ungültiger Eingabe. Liegt immer innerhalb der Arena. */
+	private static Vec3 parsePoint(String text) {
+		String[] xz = text.split(":");
 		if (xz.length != 2) {
-			return;
+			return null;
 		}
 		try {
-			double x = Math.clamp(Double.parseDouble(xz[0]), -ArenaLayout.HALF_LENGTH + 1, ArenaLayout.HALF_LENGTH - 1);
-			double z = Math.clamp(Double.parseDouble(xz[1]), -ArenaLayout.HALF_WIDTH + 1, ArenaLayout.HALF_WIDTH - 1);
-			if (Double.isFinite(x) && Double.isFinite(z)) {
-				hero.commandFocus = new Vec3(x, ArenaLayout.GROUND_Y + 1, z);
+			double x = Double.parseDouble(xz[0]);
+			double z = Double.parseDouble(xz[1]);
+			if (!Double.isFinite(x) || !Double.isFinite(z)) {
+				return null;
 			}
-		} catch (NumberFormatException ignored) {
-			// ungültige Eingabe vom Client: Fokus bleibt
+			return new Vec3(Math.clamp(x, -ArenaLayout.HALF_LENGTH + 1, ArenaLayout.HALF_LENGTH - 1), ArenaLayout.GROUND_Y + 1,
+					Math.clamp(z, -ArenaLayout.HALF_WIDTH + 1, ArenaLayout.HALF_WIDTH - 1));
+		} catch (NumberFormatException e) {
+			return null;
 		}
 	}
 
@@ -1622,52 +1532,9 @@ public final class Match {
 		return new Vec3(x, pos.getY() + 1, z);
 	}
 
-	/**
-	 * Zielpunkt für Zauber und Sammelpunkt: in der Kommandoansicht die Bildmitte, sonst der Punkt,
-	 * auf den der Häuptling schaut (erster Block oder erstes Wesen in Reichweite).
-	 */
-	private Vec3 aimPoint(ServerPlayer player, double range) {
-		Hero hero = heroes.get(player.getUUID());
-		if (hero != null && hero.commandView && hero.commandFocus != null) {
-			return surfaceAt(hero.commandFocus.x, hero.commandFocus.z);
-		}
-		Vec3 eye = player.getEyePosition();
-		Vec3 look = player.getLookAngle();
-		for (double d = 1.0; d <= range; d += 0.5) {
-			Vec3 point = eye.add(look.scale(d));
-			BlockPos pos = BlockPos.containing(point.x, point.y, point.z);
-			if (!arena.getBlockState(pos).isAir()) {
-				return eye.add(look.scale(d - 0.5));
-			}
-			AABB probe = new AABB(point.x - 0.5, point.y - 0.5, point.z - 0.5, point.x + 0.5, point.y + 0.5, point.z + 0.5);
-			if (!arena.getEntitiesOfClass(LivingEntity.class, probe, e -> e != player && e.isAlive() && !e.isSpectator()).isEmpty()) {
-				return point;
-			}
-		}
-		return eye.add(look.scale(range));
-	}
-
-	private void castSpell(ServerPlayer player, Hero hero, SpellType spell) {
-		if (phase != MatchPhase.BATTLE) {
-			return;
-		}
-		if (hero.dead) {
-			feedback(player, PurchaseResult.HERO_DEAD, Component.empty());
-			return;
-		}
-		TeamState state = teams.get(hero.team);
-		PurchaseResult result = state.checkCast(spell, tick);
-		if (!result.ok()) {
-			feedback(player, result, Component.empty());
-			return;
-		}
-		Balance.Spell config = balance.spell(spell.id());
-		state.payCast(spell, tick);
-		player.getCooldowns().addCooldown(HeroKit.create(HeroKit.Slot.forAction(spell.id())), config.cooldownSeconds() * 20);
-		Vec3 target = aimPoint(player, config.range());
-		player.swing(net.minecraft.world.InteractionHand.MAIN_HAND, true);
-		Vec3 origin = player.getEyePosition().add(player.getLookAngle().scale(0.8));
-		releaseSpell(hero.team, spell, origin, target, player);
+	/** Zielpunkt eines Zaubers am Boden: die Oberfläche an der angeklickten Stelle. */
+	private Vec3 groundTarget(Vec3 point) {
+		return surfaceAt(point.x, point.z);
 	}
 
 	/**
@@ -1723,7 +1590,7 @@ public final class Match {
 			if (entity.position().distanceTo(center) > radius + 0.5) {
 				continue;
 			}
-			if (entity instanceof ServerPlayer player && !isTargetableHero(player)) {
+			if (!(entity instanceof GoblinUnit)) {
 				continue;
 			}
 			entity.heal((float) amount);
@@ -1749,21 +1616,8 @@ public final class Match {
 			}
 			if (entity instanceof GoblinUnit unit) {
 				unit.root(ticks);
-			} else if (entity instanceof ServerPlayer player) {
-				rootHero(player, ticks);
 			}
 		}
-	}
-
-	private void rootHero(ServerPlayer player, int ticks) {
-		Hero hero = heroes.get(player.getUUID());
-		if (hero == null) {
-			return;
-		}
-		hero.rootedUntil = Math.max(hero.rootedUntil, tick + ticks);
-		setModifier(player, Attributes.MOVEMENT_SPEED, ROOT_MODIFIER, -1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-		setModifier(player, Attributes.JUMP_STRENGTH, ROOT_JUMP_MODIFIER, -1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-		player.sendOverlayMessage(Component.translatable("message.goblinforest.rooted").withStyle(ChatFormatting.DARK_GREEN));
 	}
 
 	/** Blitzsturm: {@code bolts} Blitze nacheinander auf zufällige Gegner im Umkreis (bei wenigen Gegnern auch mehrfach). */
@@ -1863,34 +1717,34 @@ public final class Match {
 		}
 	}
 
-	private void useAbility(ServerPlayer player, Hero hero, AbilityType ability) {
+	/**
+	 * Fähigkeit des Häuptlings auslösen, für Spieler, KI und Selbsttest. Wirkt rund um den Häuptling, wo immer er
+	 * gerade kämpft; ist er tot, geht es nicht.
+	 */
+	public PurchaseResult useAbility(TeamColor team, AbilityType ability) {
 		if (phase != MatchPhase.BATTLE) {
-			return;
+			return PurchaseResult.NOT_AVAILABLE;
 		}
-		if (hero.dead) {
-			feedback(player, PurchaseResult.HERO_DEAD, Component.empty());
-			return;
+		GoblinUnit chief = chieftain(team);
+		if (chief == null) {
+			return PurchaseResult.HERO_DEAD;
 		}
-		TeamState state = teams.get(hero.team);
+		TeamState state = teams.get(team);
 		PurchaseResult result = state.checkAbility(ability, tick);
 		if (!result.ok()) {
-			feedback(player, result, Component.empty());
-			return;
+			return result;
 		}
 		state.startAbilityCooldown(ability, tick);
 		Balance.Ability config = balance.ability(ability.id());
 		int rank = state.abilityRank(ability);
-		if (!ability.charged()) {
-			player.getCooldowns().addCooldown(HeroKit.create(HeroKit.Slot.forAction(ability.id())), config.cooldownTicksAt(rank));
-		}
-		player.swing(net.minecraft.world.InteractionHand.MAIN_HAND, true);
+		chief.swing(net.minecraft.world.InteractionHand.MAIN_HAND, true);
 		double radius = config.radiusAt(rank);
-		AABB box = player.getBoundingBox().inflate(radius, 3, radius);
+		AABB box = chief.getBoundingBox().inflate(radius, 3, radius);
 		switch (ability) {
 			case BLOODLUST -> {
 				int affected = 0;
-				for (GoblinUnit unit : arena.getEntitiesOfClass(GoblinUnit.class, box, u -> owns(u) && u.team() == hero.team && u.isAlive())) {
-					if (unit.distanceTo(player) <= radius) {
+				for (GoblinUnit unit : arena.getEntitiesOfClass(GoblinUnit.class, box, u -> owns(u) && u.team() == team && u.isAlive())) {
+					if (unit.distanceTo(chief) <= radius) {
 						unit.applyBloodlust(config.durationTicksAt(rank), config.amountAt(rank));
 						arena.sendParticles(ParticleTypes.ANGRY_VILLAGER, unit.getX(), unit.getY() + 2.2, unit.getZ(), 1, 0.1, 0.1, 0.1, 0);
 						affected++;
@@ -1899,106 +1753,88 @@ public final class Match {
 				DustParticleOptions dust = new DustParticleOptions(0xD0201A, 1.6f);
 				for (int i = 0; i < 48; i++) {
 					double angle = Math.PI * 2 * i / 48;
-					arena.sendParticles(dust, player.getX() + Math.cos(angle) * radius, player.getY() + 0.3, player.getZ() + Math.sin(angle) * radius, 1, 0, 0.1, 0, 0);
+					arena.sendParticles(dust, chief.getX() + Math.cos(angle) * radius, chief.getY() + 0.3, chief.getZ() + Math.sin(angle) * radius, 1, 0, 0.1, 0, 0);
 				}
-				arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RAVAGER_ROAR, SoundSource.PLAYERS, 0.8f, 1.5f);
-				player.sendOverlayMessage(Component.translatable("message.goblinforest.bloodlust", affected).withStyle(ChatFormatting.RED));
+				arena.playSound(null, chief.getX(), chief.getY(), chief.getZ(), SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 1.0f, 1.5f);
+				for (ServerPlayer player : onlineHeroes(team)) {
+					player.sendOverlayMessage(Component.translatable("message.goblinforest.bloodlust", affected).withStyle(ChatFormatting.RED));
+				}
 			}
 			case BATTLE_SLAM -> {
 				double damage = config.amountAt(rank) * state.heroDamageMultiplier(tick);
-				for (LivingEntity entity : arena.getEntitiesOfClass(LivingEntity.class, box, e -> isDamageableEnemy(hero.team, e))) {
-					if (entity.distanceTo(player) > radius) {
+				DamageSource source = arena.damageSources().mobAttack(chief);
+				for (LivingEntity entity : arena.getEntitiesOfClass(LivingEntity.class, box, e -> isDamageableEnemy(team, e))) {
+					if (entity.distanceTo(chief) > radius) {
 						continue;
 					}
-					hurtAsTeam(entity, arena.damageSources().playerAttack(player), damage, hero.team);
-					Knockback.shove(entity, entity.getX() - player.getX(), entity.getZ() - player.getZ(), 1.3);
+					hurtAsTeam(entity, source, damage, team);
+					Knockback.shove(entity, entity.getX() - chief.getX(), entity.getZ() - chief.getZ(), 1.3);
 				}
-				arena.sendParticles(ParticleTypes.EXPLOSION, player.getX(), player.getY() + 0.2, player.getZ(), 3, 1, 0.1, 1, 0);
+				arena.sendParticles(ParticleTypes.EXPLOSION, chief.getX(), chief.getY() + 0.2, chief.getZ(), 3, 1, 0.1, 1, 0);
 				arena.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.DIRT.defaultBlockState()),
-						player.getX(), player.getY() + 0.1, player.getZ(), 80, radius * 0.5, 0.1, radius * 0.5, 0.3);
-				arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.PLAYERS, 1.0f, 0.8f);
-				arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.GENERIC_EXPLODE.value(), SoundSource.PLAYERS, 0.6f, 1.4f);
+						chief.getX(), chief.getY() + 0.1, chief.getZ(), 80, radius * 0.5, 0.1, radius * 0.5, 0.3);
+				arena.playSound(null, chief.getX(), chief.getY(), chief.getZ(), SoundEvents.MACE_SMASH_GROUND_HEAVY, SoundSource.HOSTILE, 1.2f, 0.8f);
+				arena.playSound(null, chief.getX(), chief.getY(), chief.getZ(), SoundEvents.GENERIC_EXPLODE.value(), SoundSource.HOSTILE, 0.7f, 1.4f);
 			}
-			case RAGE -> startRage(player, hero);
+			case RAGE -> startRage(team, chief);
 		}
+		return PurchaseResult.OK;
 	}
 
 	// ================================================================ Raserei
 
-	private void startRage(ServerPlayer player, Hero hero) {
-		TeamState state = teams.get(hero.team);
-		hero.raging = true;
-		applyRageModifiers(player, hero.team);
-		title(player, Component.empty(), Component.translatable("title.goblinforest.rage").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD), 0, 30, 10);
-		arena.sendParticles(ParticleTypes.ANGRY_VILLAGER, player.getX(), player.getY() + 2.2, player.getZ(), 6, 0.4, 0.3, 0.4, 0);
-		arena.sendParticles(ParticleTypes.FLAME, player.getX(), player.getY() + 1, player.getZ(), 40, 0.5, 0.8, 0.5, 0.08);
-		arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.RAVAGER_ROAR, SoundSource.PLAYERS, 1.2f, 0.8f);
-		arena.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.WARDEN_ROAR, SoundSource.PLAYERS, 0.4f, 1.6f);
-		announceToTeam(hero.team.opponent(), null, Component.translatable("message.goblinforest.enemy_rage").withStyle(ChatFormatting.RED));
-		player.sendOverlayMessage(Component.translatable("message.goblinforest.rage_started",
-				state.rageRemaining(tick) / 20).withStyle(ChatFormatting.DARK_RED));
-	}
-
-	private void applyRageModifiers(ServerPlayer player, TeamColor team) {
+	private void startRage(TeamColor team, GoblinUnit chief) {
 		TeamState state = teams.get(team);
-		setModifier(player, Attributes.ATTACK_DAMAGE, RAGE_DAMAGE_MODIFIER, state.heroDamageMultiplier(tick) - 1.0, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
-		setModifier(player, Attributes.MOVEMENT_SPEED, RAGE_SPEED_MODIFIER, balance.rage().speedBonus(), AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
-	}
-
-	private void endRage(ServerPlayer player, Hero hero) {
-		hero.raging = false;
-		teams.get(hero.team).endRage();
-		removeModifier(player, Attributes.ATTACK_DAMAGE, RAGE_DAMAGE_MODIFIER);
-		removeModifier(player, Attributes.MOVEMENT_SPEED, RAGE_SPEED_MODIFIER);
-	}
-
-	private void tickRage(ServerPlayer player, Hero hero) {
-		if (!hero.raging) {
-			return;
-		}
-		TeamState state = teams.get(hero.team);
-		if (!state.rageActive(tick)) {
-			endRage(player, hero);
-			player.sendOverlayMessage(Component.translatable("message.goblinforest.rage_ended").withStyle(ChatFormatting.GRAY));
-			return;
-		}
-		if (tick % 4 == 0) {
-			arena.sendParticles(new DustParticleOptions(0xB01010, 1.4f), player.getX(), player.getY() + 1.0, player.getZ(), 3, 0.35, 0.6, 0.35, 0);
-			arena.sendParticles(ParticleTypes.SMALL_FLAME, player.getX(), player.getY() + 0.2, player.getZ(), 1, 0.3, 0.1, 0.3, 0.01);
+		chieftains.get(team).raging = true;
+		chief.refreshChieftain(false);
+		arena.sendParticles(ParticleTypes.ANGRY_VILLAGER, chief.getX(), chief.getY() + 2.4, chief.getZ(), 6, 0.4, 0.3, 0.4, 0);
+		arena.sendParticles(ParticleTypes.FLAME, chief.getX(), chief.getY() + 1, chief.getZ(), 40, 0.5, 0.8, 0.5, 0.08);
+		arena.playSound(null, chief.getX(), chief.getY(), chief.getZ(), SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 1.4f, 0.8f);
+		arena.playSound(null, chief.getX(), chief.getY(), chief.getZ(), SoundEvents.WARDEN_ROAR, SoundSource.HOSTILE, 0.5f, 1.6f);
+		announceToTeam(team.opponent(), null, Component.translatable("message.goblinforest.enemy_rage").withStyle(ChatFormatting.RED));
+		for (ServerPlayer player : onlineHeroes(team)) {
+			title(player, Component.empty(), Component.translatable("title.goblinforest.rage").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD), 0, 30, 10);
+			player.sendOverlayMessage(Component.translatable("message.goblinforest.rage_started", state.rageRemaining(tick) / 20).withStyle(ChatFormatting.DARK_RED));
 		}
 	}
 
-	/** Der Häuptling hat Schaden ausgeteilt: Raserei laden, während der Raserei Lebensraub. */
-	public void onHeroDealtDamage(ServerPlayer player, double amount) {
-		Hero hero = heroes.get(player.getUUID());
-		if (hero == null || hero.dead || phase != MatchPhase.BATTLE || amount <= 0) {
+	private void endRage(TeamColor team) {
+		chieftains.get(team).raging = false;
+		teams.get(team).endRage();
+		GoblinUnit chief = chieftain(team);
+		if (chief != null) {
+			chief.refreshChieftain(false);
+		}
+	}
+
+	private void tickRage(TeamColor team, Chieftain chieftain) {
+		if (!chieftain.raging) {
 			return;
 		}
-		TeamState state = teams.get(hero.team);
-		if (state.rageActive(tick)) {
-			float heal = (float) (amount * state.rageLifesteal());
-			if (heal > 0 && player.getHealth() < player.getMaxHealth()) {
-				player.heal(heal);
-				arena.sendParticles(new DustParticleOptions(0x9C0A0A, 1.0f), player.getX(), player.getY() + 1.2, player.getZ(), 4, 0.3, 0.4, 0.3, 0);
+		if (!teams.get(team).rageActive(tick)) {
+			endRage(team);
+			for (ServerPlayer player : onlineHeroes(team)) {
+				player.sendOverlayMessage(Component.translatable("message.goblinforest.rage_ended").withStyle(ChatFormatting.GRAY));
 			}
-		} else {
-			addRage(player, hero, amount * balance.rage().chargePerDamageDealt());
+			return;
+		}
+		GoblinUnit chief = chieftain(team);
+		if (chief != null && tick % 4 == 0) {
+			arena.sendParticles(new DustParticleOptions(0xB01010, 1.4f), chief.getX(), chief.getY() + 1.0, chief.getZ(), 3, 0.35, 0.6, 0.35, 0);
+			arena.sendParticles(ParticleTypes.SMALL_FLAME, chief.getX(), chief.getY() + 0.2, chief.getZ(), 1, 0.3, 0.1, 0.3, 0.01);
 		}
 	}
 
-	/** Der Häuptling hat Schaden eingesteckt: lädt die Raserei. */
-	private void onHeroTookDamage(ServerPlayer player, Hero hero, double amount) {
-		addRage(player, hero, amount * balance.rage().chargePerDamageTaken());
-	}
-
-	private void addRage(ServerPlayer player, Hero hero, double amount) {
-		TeamState state = teams.get(hero.team);
+	private void addRage(TeamColor team, double amount) {
+		TeamState state = teams.get(team);
 		boolean wasFull = state.rageCharge() >= state.rageMax();
 		state.addRage(amount, tick);
 		if (!wasFull && state.rageCharge() >= state.rageMax()) {
-			player.sendOverlayMessage(Component.translatable("message.goblinforest.rage_ready",
-					Component.keybind("key.goblinforest.rage")).withStyle(ChatFormatting.GOLD));
-			playTo(player, SoundEvents.PIGLIN_BRUTE_ANGRY, 0.8f, 1.2f);
+			for (ServerPlayer player : onlineHeroes(team)) {
+				player.sendOverlayMessage(Component.translatable("message.goblinforest.rage_ready",
+						Component.keybind("key.goblinforest.rage")).withStyle(ChatFormatting.GOLD));
+				playTo(player, SoundEvents.PIGLIN_BRUTE_ANGRY, 0.8f, 1.2f);
+			}
 		}
 	}
 
@@ -2049,10 +1885,6 @@ public final class Match {
 		for (ServerPlayer player : onlineHeroes()) {
 			Hero hero = heroes.get(player.getUUID());
 			boolean won = hero.team == winningTeam;
-			hero.commandView = false;
-			if (hero.dead) {
-				respawnHero(player, hero);
-			}
 			Component winnerName = Component.translatable(winningTeam.translationKey()).withColor(winningTeam.rgb());
 			if (series == null) {
 				title(player, Component.translatable(won ? "title.goblinforest.victory" : "title.goblinforest.defeat")
@@ -2108,20 +1940,24 @@ public final class Match {
 			return;
 		}
 		finished = true;
-		for (ServerPlayer player : onlineHeroes()) {
-			Hero hero = heroes.get(player.getUUID());
-			if (hero.prepared) {
-				clearHeroEffects(player);
-				setFrozen(player, true);
-			}
-		}
+		discardUnits();
+		clearArenaEntities();
+		removeScoreboardTeams();
+		scheduled.clear();
+	}
+
+	/** Entfernt alle Einheiten und Häuptlinge. */
+	private void discardUnits() {
 		for (GoblinUnit unit : units) {
 			unit.discard();
 		}
 		units.clear();
-		clearArenaEntities();
-		removeScoreboardTeams();
-		scheduled.clear();
+		for (Chieftain chieftain : chieftains.values()) {
+			if (chieftain.unit != null) {
+				chieftain.unit.discard();
+				chieftain.unit = null;
+			}
+		}
 	}
 
 	/** Bricht das Match ab (oder schließt es nach dem Ende): alle Spieler zurück, Arena aufräumen. */
@@ -2139,10 +1975,7 @@ public final class Match {
 				restoreHero(player);
 			}
 		}
-		for (GoblinUnit unit : units) {
-			unit.discard();
-		}
-		units.clear();
+		discardUnits();
 		clearArenaEntities();
 		removeScoreboardTeams();
 		forceChunks(false);
@@ -2197,7 +2030,7 @@ public final class Match {
 		}
 		List<MatchStatePayload.ShopEntry> shop = new ArrayList<>();
 		int living = livingUnits(team);
-		for (UnitType type : UnitType.values()) {
+		for (UnitType type : UnitType.soldiers()) {
 			Balance.UnitStats stats = balance.unit(type);
 			shop.add(new MatchStatePayload.ShopEntry("recruit:" + type.id(), 0, 0, stats.cost(), stats.unlockReputation(),
 					state.checkRecruit(type, living).ordinal()));
@@ -2228,6 +2061,14 @@ public final class Match {
 		for (AbilityType ability : AbilityType.values()) {
 			cooldowns.add(new MatchStatePayload.Cooldown(ability.id(), (int) state.cooldownRemaining(ability.id(), tick), (int) state.cooldownLength(ability.id())));
 		}
+		Chieftain chieftain = chieftains.get(team);
+		GoblinUnit chief = chieftain(team);
+		int chieftainState = chief == null ? MatchStatePayload.CHIEFTAIN_DEAD
+				: chieftain.deployed ? MatchStatePayload.CHIEFTAIN_FIELD : MatchStatePayload.CHIEFTAIN_HOME;
+		if (chief == null && chieftain.respawnTicks <= 0) {
+			// Vor Rundenbeginn gibt es noch keinen Häuptling: er wartet in der Festung.
+			chieftainState = MatchStatePayload.CHIEFTAIN_HOME;
+		}
 		int phaseSeconds = switch (phase) {
 			case COUNTDOWN, ENDED -> (phaseTicks + 19) / 20;
 			case SETUP -> builder == null ? 0 : (int) Math.round(builder.progress() * 100);
@@ -2237,16 +2078,27 @@ public final class Match {
 				phase.ordinal(), team.ordinal(), phaseSeconds, (int) (battleTicks / 20),
 				state.gold(), state.reputation(), (float) state.reputationProgress(),
 				state.population(), state.populationLimit(), state.stance().ordinal(),
-				state.heroLevel(), (float) state.heroProgression().progressToNext(state.heroXp()), hero.dead ? (hero.respawnTicks + 19) / 20 : 0,
+				state.heroLevel(), (float) state.heroProgression().progressToNext(state.heroXp()),
+				chieftainState, chieftainRespawnSeconds(team),
+				chief == null ? 0f : chief.getHealth(), (float) chieftainMaxHealth(team),
+				chief == null ? 0f : (float) chief.getX(), chief == null ? 0f : (float) chief.getZ(), chieftain.sentOnce,
 				new float[] {(float) teams.get(TeamColor.RED).coreHealth(), (float) teams.get(TeamColor.GREEN).coreHealth()},
 				new float[] {(float) teams.get(TeamColor.RED).coreMaxHealth(), (float) teams.get(TeamColor.GREEN).coreMaxHealth()},
 				new float[] {(float) teams.get(TeamColor.RED).towerHealth(), (float) teams.get(TeamColor.GREEN).towerHealth()},
 				new float[] {(float) teams.get(TeamColor.RED).towerMaxHealth(), (float) teams.get(TeamColor.GREEN).towerMaxHealth()},
 				unitCounts, enemyUnits, enemyState.heroLevel(), enemyState.reputation(), rallyPoints.containsKey(team),
-				shop, cooldowns,
+				shop, cooldowns, spellRadii(),
 				state.abilityPoints(), (float) (state.rageCharge() / state.rageMax()), (int) ((state.rageRemaining(tick) + 19) / 20),
 				phase == MatchPhase.BATTLE ? (int) secondsUntilSuddenDeath() : -1, (float) state.incomePerSecond(),
-				new int[] {roundWins(TeamColor.RED), roundWins(TeamColor.GREEN)}, bestOf(), hero.commandView);
+				new int[] {roundWins(TeamColor.RED), roundWins(TeamColor.GREEN)}, bestOf());
+	}
+
+	private float[] spellRadii() {
+		float[] radii = new float[SpellType.values().length];
+		for (SpellType spell : SpellType.values()) {
+			radii[spell.ordinal()] = (float) balance.spell(spell.id()).radius();
+		}
+		return radii;
 	}
 
 	/** Zeilen für {@code /gf status}. */
@@ -2298,17 +2150,22 @@ public final class Match {
 		return result;
 	}
 
-	/**
-	 * Zauber ohne Häuptling auf einen Punkt wirken (bezahlt wie ein echter Zauber); für KI und Selbsttest.
-	 * Der Zauber geht vom eigenen Turm aus, oder vom Festungskern, wenn der Turm gefallen ist.
-	 */
+	/** Zauber für einen Clan auf einen Punkt wirken (bezahlt wie ein echter Zauber); für KI und Selbsttest. */
 	public PurchaseResult castSpellFor(TeamColor team, SpellType spell, Vec3 target) {
+		return castSpellFor(team, spell, groundTarget(target), null);
+	}
+
+	/**
+	 * Wirkt ein Wunder auf einen Punkt am Boden. Der Feldherr zaubert aus der Draufsicht, deshalb kommt der Feuerball
+	 * schräg vom Himmel aus Richtung der eigenen Festung, die übrigen Zauber erscheinen direkt am Ziel.
+	 */
+	private PurchaseResult castSpellFor(TeamColor team, SpellType spell, Vec3 target, ServerPlayer caster) {
 		TeamState state = teams.get(team);
 		PurchaseResult result = state.checkCast(spell, tick);
 		if (result.ok()) {
 			state.payCast(spell, tick);
-			ArenaLayout.Point origin = state.towerAlive() ? ArenaLayout.towerMuzzle(team) : ArenaLayout.coreBox(team).center();
-			releaseSpell(team, spell, spell == SpellType.FIREBALL ? vec(origin) : target.add(0, 3, 0), target, null);
+			Vec3 origin = spell == SpellType.FIREBALL ? target.add(ArenaLayout.side(team) * 10, 16, 0) : target.add(0, 3, 0);
+			releaseSpell(team, spell, origin, target, caster);
 		}
 		return result;
 	}

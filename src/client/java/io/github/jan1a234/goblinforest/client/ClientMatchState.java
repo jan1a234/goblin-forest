@@ -1,6 +1,7 @@
 package io.github.jan1a234.goblinforest.client;
 
 import io.github.jan1a234.goblinforest.net.MatchStatePayload;
+import net.minecraft.client.Minecraft;
 
 /** Letzter vom Server empfangener Match-Zustand; HUD und Kriegsmenü lesen nur von hier. */
 public final class ClientMatchState {
@@ -34,7 +35,7 @@ public final class ClientMatchState {
 		state = MatchStatePayload.none();
 	}
 
-	static void tick() {
+	static void tick(Minecraft client) {
 		ticks++;
 	}
 

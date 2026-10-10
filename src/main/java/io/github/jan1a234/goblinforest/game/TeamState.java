@@ -185,6 +185,9 @@ public final class TeamState {
 
 	/** Prüft, ob eine Gruppe dieses Typs rekrutiert werden kann. {@code livingUnits} zählt alle eigenen Einheiten. */
 	public PurchaseResult checkRecruit(UnitType type, int livingUnits) {
+		if (!type.soldier()) {
+			return PurchaseResult.NOT_AVAILABLE;
+		}
 		Balance.UnitStats stats = balance.unit(type);
 		if (!isUnlocked(type)) {
 			return PurchaseResult.REPUTATION_TOO_LOW;
@@ -219,7 +222,11 @@ public final class TeamState {
 		return upgrades.getOrDefault(key, 0);
 	}
 
+	/** Stufe eines Einheiten-Upgrades; der Häuptling wird nicht über Upgrades verbessert, sondern über sein Level (0). */
 	public int unitUpgrade(UpgradeType type, UnitType unit) {
+		if (!unit.soldier()) {
+			return 0;
+		}
 		return level(UpgradeKey.unit(type, unit));
 	}
 

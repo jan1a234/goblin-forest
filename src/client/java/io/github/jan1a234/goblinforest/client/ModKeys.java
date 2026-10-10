@@ -7,7 +7,10 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import org.lwjgl.glfw.GLFW;
 
-/** Tastenbelegung (in den Minecraft-Steuerungsoptionen unter „Goblin Forest" änderbar). */
+/**
+ * Tastenbelegung (in den Minecraft-Steuerungsoptionen unter „Goblin Forest" änderbar). Im Match wertet
+ * {@link CommandScreen} die Tasten aus; Zauber und der Sammelpunkt warten danach auf einen Klick ins Feld.
+ */
 public final class ModKeys {
 	public static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(GoblinForest.id("main"));
 
@@ -17,7 +20,8 @@ public final class ModKeys {
 
 	public static final List<Binding> ACTIONS = new ArrayList<>();
 	public static KeyMapping MENU;
-	public static KeyMapping COMMAND_VIEW;
+	/** Kamera zum eigenen Häuptling springen lassen. */
+	public static KeyMapping CENTER_CHIEFTAIN;
 
 	private ModKeys() {
 	}
@@ -28,7 +32,8 @@ public final class ModKeys {
 
 	public static void register() {
 		MENU = key("menu", GLFW.GLFW_KEY_B);
-		COMMAND_VIEW = key("command_view", GLFW.GLFW_KEY_LEFT_ALT);
+		CENTER_CHIEFTAIN = key("center_chieftain", GLFW.GLFW_KEY_SPACE);
+		ACTIONS.add(new Binding(key("chieftain", GLFW.GLFW_KEY_Q), "chieftain:toggle"));
 		ACTIONS.add(new Binding(key("recruit_slave", GLFW.GLFW_KEY_Z), "recruit:slave"));
 		ACTIONS.add(new Binding(key("recruit_warrior", GLFW.GLFW_KEY_X), "recruit:warrior"));
 		ACTIONS.add(new Binding(key("recruit_archer", GLFW.GLFW_KEY_C), "recruit:archer"));
@@ -47,13 +52,11 @@ public final class ModKeys {
 		ACTIONS.add(new Binding(key("roots", GLFW.GLFW_KEY_UNKNOWN), "cast:roots"));
 		ACTIONS.add(new Binding(key("lightning", GLFW.GLFW_KEY_UNKNOWN), "cast:lightning"));
 		ACTIONS.add(new Binding(key("meteor", GLFW.GLFW_KEY_UNKNOWN), "cast:meteor"));
-		ACTIONS.add(new Binding(key("zoom_in", GLFW.GLFW_KEY_PAGE_UP), "zoom:in"));
-		ACTIONS.add(new Binding(key("zoom_out", GLFW.GLFW_KEY_PAGE_DOWN), "zoom:out"));
 	}
 
-	/** Hotbar-Taste (1–9) für Zauber und Fähigkeiten, die sonst keine eigene Taste haben. */
-	private static final String[] HOTBAR = {"", "cast:fireball", "cast:healing", "cast:roots", "cast:lightning", "cast:meteor",
-			"ability:bloodlust", "ability:battleSlam", "ability:rage"};
+	/** Hotbar-Tasten 1–9: Zauber 1–5, Fähigkeiten 6–8, Häuptling losschicken/zurückrufen 9. */
+	static final String[] HOTBAR = {"cast:fireball", "cast:healing", "cast:roots", "cast:lightning", "cast:meteor",
+			"ability:bloodlust", "ability:battleSlam", "ability:rage", "chieftain:toggle"};
 
 	/** Anzeigename der Taste, die eine Aktion auslöst (für HUD und Menü), oder leer. */
 	public static String label(String action) {
@@ -64,7 +67,7 @@ public final class ModKeys {
 		}
 		for (int i = 0; i < HOTBAR.length; i++) {
 			if (HOTBAR[i].equals(action)) {
-				return "#" + (i + 1);
+				return String.valueOf(i + 1);
 			}
 		}
 		return "";

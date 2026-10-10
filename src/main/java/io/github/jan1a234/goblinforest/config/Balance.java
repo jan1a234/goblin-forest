@@ -54,8 +54,8 @@ public record Balance(
 	}
 
 	/**
-	 * Ablauf eines Matches. Sudden Death: ab {@code suddenDeathMinutes} Kampfzeit verlieren beide Festungskerne
-	 * jede Sekunde {@code suddenDeathPercentPerSecond} ihrer maximalen Lebenspunkte.
+	 * Ablauf eines Matches. Sudden Death (nur wenn beim Start eingeschaltet, {@code /gf start sd}): ab {@code suddenDeathMinutes}
+	 * Kampfzeit verlieren beide Festungskerne jede Sekunde {@code suddenDeathPercentPerSecond} ihrer maximalen Lebenspunkte.
 	 */
 	public record Match(
 			int countdownSeconds,
@@ -132,6 +132,8 @@ public record Balance(
 			double trollKnockback,
 			double trollCleaveRadius,
 			double trollCleaveShare,
+			double chieftainCleaveRadius,
+			double chieftainCleaveShare,
 			double wolfChargeMultiplier,
 			double wolfChargeKnockback,
 			int wolfChargeRechargeSeconds,
@@ -208,6 +210,10 @@ public record Balance(
 	) {
 	}
 
+	/**
+	 * Häuptling (DESIGN.md Abschnitt 6): Leben und Schaden je Heldenlevel, Wiederbelebungszeit nach dem Tod.
+	 * Tempo, Größe und Angriffstakt stehen beim Einheiteneintrag {@code units.chieftain}.
+	 */
 	public record Hero(
 			double baseHealth,
 			double healthPerLevel,

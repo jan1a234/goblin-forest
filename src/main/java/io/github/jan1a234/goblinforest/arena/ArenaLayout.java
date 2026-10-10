@@ -131,6 +131,11 @@ public final class ArenaLayout {
 		return new Point(side(team) * (WALL_FRONT_X + 6) + 0.5, GROUND_Y + 1, 9.5);
 	}
 
+	/** Startblick der Draufsicht: knapp vor dem eigenen Tor, sodass Festung und Vorfeld im Bild sind. */
+	public static Point overviewStart(TeamColor team) {
+		return new Point(side(team) * (WALL_FRONT_X - 6) + 0.5, GROUND_Y + 1, 0.5);
+	}
+
 	/** Blickrichtung (Yaw) zum Gegner: Rot schaut nach Osten (-90°), Grün nach Westen (90°). */
 	public static float facingYaw(TeamColor team) {
 		return team == TeamColor.RED ? -90f : 90f;

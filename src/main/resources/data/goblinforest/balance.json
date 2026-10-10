@@ -31,7 +31,8 @@
 		"shaman":    { "cost": 90,  "population": 3, "groupSize": 1, "health": 60,  "damage": 6,  "range": 10, "speed": 0.22, "unlockReputation": 2, "attackCooldownTicks": 30,  "aggroRange": 14, "scale": 0.9 },
 		"wolfRider": { "cost": 110, "population": 4, "groupSize": 1, "health": 170, "damage": 16, "range": 0,  "speed": 0.38, "unlockReputation": 2, "attackCooldownTicks": 20,  "aggroRange": 14, "scale": 1.0 },
 		"troll":     { "cost": 150, "population": 5, "groupSize": 1, "health": 480, "damage": 26, "range": 0,  "speed": 0.2,  "unlockReputation": 3, "attackCooldownTicks": 32,  "aggroRange": 10, "scale": 1.55 },
-		"catapult":  { "cost": 200, "population": 5, "groupSize": 1, "health": 150, "damage": 60, "range": 22, "speed": 0.17, "unlockReputation": 4, "attackCooldownTicks": 100, "aggroRange": 0,  "scale": 1.0 }
+		"catapult":  { "cost": 200, "population": 5, "groupSize": 1, "health": 150, "damage": 60, "range": 22, "speed": 0.17, "unlockReputation": 4, "attackCooldownTicks": 100, "aggroRange": 0,  "scale": 1.0 },
+		"chieftain": { "cost": 0,   "population": 0, "groupSize": 1, "health": 0,   "damage": 0,  "range": 0,  "speed": 0.27, "unlockReputation": 0, "attackCooldownTicks": 20,  "aggroRange": 12, "scale": 1.25 }
 	},
 	"traits": {
 		"warriorFrontalBlock": 0.30,
@@ -48,6 +49,8 @@
 		"trollKnockback": 0.9,
 		"trollCleaveRadius": 2.0,
 		"trollCleaveShare": 0.5,
+		"chieftainCleaveRadius": 2.2,
+		"chieftainCleaveShare": 0.4,
 		"wolfChargeMultiplier": 1.5,
 		"wolfChargeKnockback": 1.1,
 		"wolfChargeRechargeSeconds": 6,
@@ -105,14 +108,14 @@
 		"cannonReloadPerLevel": 0.5
 	},
 	"hero": {
-		"baseHealth": 200,
-		"healthPerLevel": 15,
-		"baseDamage": 12,
-		"damagePerLevel": 1,
+		"baseHealth": 320,
+		"healthPerLevel": 40,
+		"baseDamage": 16,
+		"damagePerLevel": 2.5,
 		"maxLevel": 10,
 		"armyXpShare": 0.25,
-		"respawnBaseSeconds": 8,
-		"respawnSecondsPerLevel": 1,
+		"respawnBaseSeconds": 12,
+		"respawnSecondsPerLevel": 2,
 		"xpForLevel": [0, 60, 150, 280, 450, 670, 950, 1300, 1720, 2220]
 	},
 	"abilities": {

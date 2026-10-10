@@ -21,8 +21,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
 /**
- * Das Kriegsmenü (Taste B): Einheiten rekrutieren, Upgrades und Festung ausbauen, Zauber verbessern,
- * Fähigkeitspunkte des Häuptlings verteilen und die Haltung der Armee wählen. Das Spiel läuft weiter, während es offen ist.
+ * Das Kriegsmenü (Taste B oder das Buch in der Befehlsleiste): Einheiten rekrutieren, Upgrades und Festung ausbauen,
+ * Zauber verbessern, Fähigkeitspunkte des Häuptlings verteilen, ihn losschicken und die Haltung der Armee wählen. Das Spiel läuft weiter, während es offen ist.
  */
 public class WarMenuScreen extends Screen {
 	private static final int WIDTH = 420;
@@ -96,9 +96,9 @@ public class WarMenuScreen extends Screen {
 
 	private void initUnits(int y) {
 		int columnWidth = (WIDTH - 24) / 2;
-		UnitType[] types = UnitType.values();
-		for (int i = 0; i < types.length; i++) {
-			UnitType type = types[i];
+		List<UnitType> types = UnitType.soldiers();
+		for (int i = 0; i < types.size(); i++) {
+			UnitType type = types.get(i);
 			int x = left + 12 + (i % 2) * (columnWidth + 4);
 			int rowY = y + (i / 2) * 32;
 			String id = "recruit:" + type.id();
@@ -136,7 +136,7 @@ public class WarMenuScreen extends Screen {
 			labels.add(new Label(Component.translatable(columns[c].translationKey()), columnX + c * (columnWidth + 4) + 4, y, GOLD));
 		}
 		y += 12;
-		for (UnitType type : UnitType.values()) {
+		for (UnitType type : UnitType.soldiers()) {
 			labels.add(new Label(Component.translatable(type.translationKey()), left + 12, y + 5, TEXT));
 			for (int c = 0; c < columns.length; c++) {
 				String id = "upgrade:" + columns[c].id() + ":" + type.id();
@@ -190,11 +190,29 @@ public class WarMenuScreen extends Screen {
 			y += 30;
 		}
 		labels.add(new Label(Component.translatable("menu.goblinforest.chieftain.hint"), left + 12, y + 18, MUTED, WIDTH - 24));
+		// Häuptling losschicken oder zurückrufen, wie mit dem Feld in der Befehlsleiste.
+		Button order = Button.builder(Component.empty(), b -> send("chieftain:toggle")).bounds(left + 12, top + HEIGHT - 30, 190, 18).build();
+		addRenderableWidget(order);
+		refreshers.add(() -> {
+			MatchStatePayload s = ClientMatchState.get();
+			String key = ModKeys.label("chieftain:toggle");
+			String suffix = key.isEmpty() ? "" : " [" + key + "]";
+			order.active = !s.chieftainDead();
+			order.setMessage(Component.translatable(s.chieftainOnField() ? "menu.goblinforest.chieftain.recall" : "menu.goblinforest.chieftain.send", suffix));
+		});
 	}
 
 	/** Knopf, der einen Kauf beim Server anfragt und sich nach dem Match-Zustand färbt und sperrt. */
 	private void shopButton(String id, int x, int y, int w, java.util.function.Function<MatchStatePayload.ShopEntry, Component> text, Component info) {
-		Button button = Button.builder(Component.empty(), b -> send(id)).bounds(x, y, w, 18).build();
+		Button button = Button.builder(Component.empty(), b -> {
+			if (CommandScreen.needsTarget(id)) {
+				// Zauber brauchen ein Ziel: Menü zu, dann ins Feld klicken.
+				onClose();
+				CommandScreen.arm(id);
+			} else {
+				send(id);
+			}
+		}).bounds(x, y, w, 18).build();
 		addRenderableWidget(button);
 		refreshers.add(() -> {
 			MatchStatePayload.ShopEntry entry = ClientMatchState.get().shopEntry(id);
@@ -251,7 +269,13 @@ public class WarMenuScreen extends Screen {
 		}
 		for (ModKeys.Binding binding : ModKeys.ACTIONS) {
 			if (binding.key().matches(event)) {
-				send(binding.action());
+				if (CommandScreen.needsTarget(binding.action())) {
+					// Zauber und Sammelbanner brauchen ein Ziel: Menü zu, dann ins Feld klicken.
+					onClose();
+					CommandScreen.arm(binding.action());
+				} else {
+					send(binding.action());
+				}
 				return true;
 			}
 		}
@@ -303,6 +327,11 @@ public class WarMenuScreen extends Screen {
 		g.fill(barX, barY + 2, barX + barW, barY + 7, 0xFF202020);
 		float fill = s.rageSeconds() > 0 ? 1f : s.rageCharge();
 		g.fill(barX, barY + 2, barX + (int) (barW * Math.clamp(fill, 0f, 1f)), barY + 7, s.rageCharge() >= 1f || s.rageSeconds() > 0 ? 0xFFFF4020 : RAGE);
+		Component state = s.chieftainDead() ? Component.translatable("hud.goblinforest.chieftain.dead", s.chieftainRespawnSeconds())
+				: Component.translatable(s.chieftainOnField() ? "hud.goblinforest.chieftain.field" : "hud.goblinforest.chieftain.home");
+		int stateX = left + 12 + 190 + 8;
+		String stateText = font.plainSubstrByWidth(state.getString(), left + WIDTH - 12 - stateX);
+		g.text(font, stateText, stateX, top + HEIGHT - 25, s.chieftainDead() ? 0xFFFF6B5B : s.chieftainOnField() ? 0xFF8BD449 : MUTED, true);
 	}
 
 	/** Beschriftungen, die mehrere Reiter teilen. */

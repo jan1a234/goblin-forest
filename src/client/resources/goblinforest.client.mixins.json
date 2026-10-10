@@ -3,7 +3,8 @@
 	"package": "io.github.jan1a234.goblinforest.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
-		"CameraMixin"
+		"CameraMixin",
+		"SoundEngineMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

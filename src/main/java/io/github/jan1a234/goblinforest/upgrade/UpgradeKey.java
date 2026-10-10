@@ -10,7 +10,7 @@ import java.util.List;
  */
 public record UpgradeKey(UpgradeType type, UnitType unit) {
 	public UpgradeKey {
-		if (type.perUnitType() != (unit != null)) {
+		if (type.perUnitType() != (unit != null) || unit != null && !unit.soldier()) {
 			throw new IllegalArgumentException("Upgrade " + type.id() + " passt nicht zu Einheit " + unit);
 		}
 	}
@@ -39,7 +39,7 @@ public record UpgradeKey(UpgradeType type, UnitType unit) {
 			return null;
 		}
 		UnitType unit = colon < 0 ? null : UnitType.byId(text.substring(colon + 1));
-		if (type.perUnitType() != (unit != null)) {
+		if (type.perUnitType() != (unit != null) || unit != null && !unit.soldier()) {
 			return null;
 		}
 		return new UpgradeKey(type, unit);
@@ -48,7 +48,7 @@ public record UpgradeKey(UpgradeType type, UnitType unit) {
 	/** Alle sinnvollen Upgrades; Reichweite nur für Fernkämpfer (siehe {@code isRanged}). */
 	public static List<UpgradeKey> all(java.util.function.Predicate<UnitType> isRanged) {
 		List<UpgradeKey> keys = new ArrayList<>();
-		for (UnitType unit : UnitType.values()) {
+		for (UnitType unit : UnitType.soldiers()) {
 			keys.add(unit(UpgradeType.ARMOR, unit));
 			keys.add(unit(UpgradeType.ATTACK, unit));
 			if (isRanged.test(unit)) {
