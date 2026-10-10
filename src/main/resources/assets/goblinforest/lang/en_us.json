@@ -45,7 +45,7 @@
 	"message.goblinforest.bounty": "+%s gold bounty",
 	"message.goblinforest.building": "Building the arena …",
 	"message.goblinforest.building_progress": "Building arena: %s %%",
-	"message.goblinforest.controls": "You are the chieftain yourself: walk through the gate onto the battlefield with W/A/S/D and fight with left click. Left Alt switches to the top-down command view and back. B opens the war menu, Z/X/C/V recruit, H switches stance, Page Up/Down zooms. Destroy the enemy stronghold!",
+	"message.goblinforest.controls": "You are the chieftain yourself: walk through the gate onto the battlefield with W/A/S/D and fight with left click. Left Alt switches to the top-down command view and back. Zoom: Ctrl + mouse wheel (just the wheel in the command view) or Page Up/Down. B opens the war menu, Z/X/C/V recruit, H switches stance. Destroy the enemy stronghold!",
 	"message.goblinforest.forfeit_warning": "The %s is no longer online. Without a return within %s seconds the match is lost.",
 	"message.goblinforest.hero_killed": "Chieftain %s has fallen! %s gold for the %s.",
 	"message.goblinforest.match_error": "The match was aborted due to an error. All items have been returned.",
@@ -295,5 +295,5 @@
 	"hud.goblinforest.command_view": "Command view · %s: back",
 	"hud.goblinforest.leave_fortress": "Walk through the gate onto the battlefield with %s",
 	"hud.goblinforest.leave_fortress.title": "You are the chieftain!",
-	"hud.goblinforest.leave_fortress.overview": "%s: top-down view of the battlefield"
+	"hud.goblinforest.leave_fortress.overview": "%s: top-down view · %s + mouse wheel: zoom"
 }

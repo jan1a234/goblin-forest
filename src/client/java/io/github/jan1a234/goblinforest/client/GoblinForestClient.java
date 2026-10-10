@@ -13,6 +13,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
+import net.fabricmc.fabric.api.event.client.player.ClientHotbarScrollEvents;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
@@ -50,6 +51,25 @@ public class GoblinForestClient implements ClientModInitializer {
 			restoreCamera(client);
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(GoblinForestClient::tick);
+		ClientHotbarScrollEvents.ALLOW.register((inventory, currentSlot, nextSlot, scrollX, scrollY) -> !scrollZoom(scrollY));
+	}
+
+	/**
+	 * Mausrad-Zoom im Match: in der Kommandoansicht immer, sonst mit gehaltener Sprinttaste (Strg).
+	 * Ohne Strg wechselt das Mausrad wie gewohnt den Hotbar-Platz. Gibt zurück, ob das Scrollen verbraucht wurde.
+	 */
+	private static boolean scrollZoom(double scrollY) {
+		Minecraft client = Minecraft.getInstance();
+		if (!ClientMatchState.active() || scrollY == 0 || !(CommandView.active() || client.options.keySprint.isDown())) {
+			return false;
+		}
+		boolean in = scrollY > 0;
+		if (CommandView.active()) {
+			CommandView.zoom(in);
+		} else {
+			ClientPlayNetworking.send(new ActionPayload(in ? "zoom:in" : "zoom:out"));
+		}
+		return true;
 	}
 
 	private static HudElement inMatch(HudElement replacement, HudElement vanilla) {

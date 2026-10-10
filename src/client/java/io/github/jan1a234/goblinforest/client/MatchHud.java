@@ -231,7 +231,7 @@ public final class MatchHud {
 
 	/**
 	 * Wegweiser zu Beginn jeder Runde, bis der Häuptling die eigene Festung verlassen hat:
-	 * Der Spieler ist selbst der Häuptling und läuft mit den Bewegungstasten durchs Tor; dazu die Taste der Draufsicht.
+	 * Der Spieler ist selbst der Häuptling und läuft mit den Bewegungstasten durchs Tor; dazu Draufsicht und Mausrad-Zoom.
 	 */
 	private static void drawLeaveFortressHint(GuiGraphicsExtractor g, Font font) {
 		Options options = mc().options;
@@ -239,7 +239,8 @@ public final class MatchHud {
 				options.keyDown.getTranslatedKeyMessage().getString(), options.keyRight.getTranslatedKeyMessage().getString());
 		Component title = Component.translatable("hud.goblinforest.leave_fortress.title");
 		Component text = Component.translatable("hud.goblinforest.leave_fortress", keys);
-		Component overview = Component.translatable("hud.goblinforest.leave_fortress.overview", ModKeys.COMMAND_VIEW.getTranslatedKeyMessage());
+		Component overview = Component.translatable("hud.goblinforest.leave_fortress.overview", ModKeys.COMMAND_VIEW.getTranslatedKeyMessage(),
+				mc().options.keySprint.getTranslatedKeyMessage());
 		int cx = g.guiWidth() / 2;
 		int y = g.guiHeight() / 2 + 22;
 		int w = Math.min(g.guiWidth() - 8, Math.max(font.width(title), Math.max(font.width(text), font.width(overview))) + 12);

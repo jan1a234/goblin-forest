@@ -38,7 +38,7 @@ Notfall: `/gf stop` bricht ein Match ab, `/gf reset` (Operatoren) holt alle Spie
 
 ### Steuerung
 
-Die Kamera steht im Match fest in der Verfolgerperspektive, ihr Abstand lässt sich einstellen. Alle Tasten lassen sich in den Steuerungsoptionen unter „Goblin Forest" ändern.
+Die Kamera steht im Match fest in der Verfolgerperspektive, ihr Abstand lässt sich mit Strg + Mausrad einstellen. Alle Tasten lassen sich in den Steuerungsoptionen unter „Goblin Forest" ändern.
 
 | Taste | Wirkung |
 |---|---|
@@ -51,7 +51,7 @@ Die Kamera steht im Match fest in der Verfolgerperspektive, ihr Abstand lässt s
 | **R** / **G** / **Y** | Blutrausch / Kampfstampfer / Raserei (Häuptlingsfähigkeiten) |
 | **J** / **K** | Feuerball / Heilende Pilze (kosten Gold) |
 | Hotbar 2–9 + Rechtsklick | Alle Zauber (auch Wurzelfessel, Blitzsturm, Meteor) und Fähigkeiten |
-| **Bild↑** / **Bild↓** | Kamera näher / weiter weg |
+| **Strg + Mausrad** (in der Kommandoansicht nur Mausrad), **Bild↑** / **Bild↓** | Kamera näher / weiter weg. Auf Laptops ohne Bild-Tasten meist **Fn + Pfeil hoch/runter** |
 | **Linke Alt-Taste** | Kommandoansicht: Kamera über dem Schlachtfeld, mit den Bewegungstasten schwenken; Zauber und Sammelpunkt zielen auf die Bildmitte |
 | Linksklick | Angreifen; auf Turm oder Festung des Gegners gehalten: Gebäude beschädigen |
 

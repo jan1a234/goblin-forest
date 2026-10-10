@@ -45,7 +45,7 @@
 	"message.goblinforest.bounty": "+%s Gold Kopfgeld",
 	"message.goblinforest.building": "Die Arena wird gebaut …",
 	"message.goblinforest.building_progress": "Arena wird gebaut: %s %%",
-	"message.goblinforest.controls": "Du bist selbst der Häuptling: lauf mit W/A/S/D durchs Tor aufs Schlachtfeld und kämpfe mit Linksklick. Linke Alt-Taste schaltet auf die Draufsicht (Kommandoansicht) und zurück. B öffnet das Kriegsmenü, Z/X/C/V rekrutieren, H wechselt die Haltung, Bild↑/Bild↓ zoomt. Zerstöre die feindliche Festung!",
+	"message.goblinforest.controls": "Du bist selbst der Häuptling: lauf mit W/A/S/D durchs Tor aufs Schlachtfeld und kämpfe mit Linksklick. Linke Alt-Taste schaltet auf die Draufsicht (Kommandoansicht) und zurück. Zoomen: Strg + Mausrad (in der Draufsicht reicht das Mausrad) oder Bild↑/Bild↓. B öffnet das Kriegsmenü, Z/X/C/V rekrutieren, H wechselt die Haltung. Zerstöre die feindliche Festung!",
 	"message.goblinforest.forfeit_warning": "Der %s ist nicht mehr online. Ohne Rückkehr in %s Sekunden ist das Match verloren.",
 	"message.goblinforest.hero_killed": "Häuptling %s ist gefallen! %s Gold für den %s.",
 	"message.goblinforest.match_error": "Das Match wurde wegen eines Fehlers abgebrochen. Alle Gegenstände wurden zurückgegeben.",
@@ -295,5 +295,5 @@
 	"hud.goblinforest.command_view": "Kommandoansicht · %s: zurück",
 	"hud.goblinforest.leave_fortress": "Lauf mit %s durchs Tor aufs Schlachtfeld",
 	"hud.goblinforest.leave_fortress.title": "Du bist der Häuptling!",
-	"hud.goblinforest.leave_fortress.overview": "%s: Draufsicht über das Schlachtfeld"
+	"hud.goblinforest.leave_fortress.overview": "%s: Draufsicht · %s + Mausrad: Zoom"
 }
