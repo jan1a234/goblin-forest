@@ -1,4 +1,24 @@
-javap net.fabricmc.fabric.api.event.client.player.ClientHotbarScrollEvents
-javap net.fabricmc.fabric.api.event.client.player.ClientHotbarScrollEvents$Allow
-javap net.fabricmc.fabric.api.event.client.player.ClientHotbarScrollEvents$Before
-sh sed -n 185,225p src-x/net/minecraft/client/MouseHandler.java
+javap net.minecraft.client.gui.screens.Screen (mouse|key|Background|isPause|onClose|removed|tick|charTyped|shouldClose|init\(|setScreen|minecraft|width|height)
+javap net.minecraft.client.gui.components.events.ContainerEventHandler mouse
+javap net.minecraft.client.input.MouseButtonEvent
+javap net.minecraft.client.input.KeyEvent
+javap net.minecraft.client.Minecraft (pauseGame|openChatScreen|setScreen|getWindow|mouseHandler|gui )
+javap net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements
+grep sound/SoundEngine
+javap net.minecraft.client.sounds.SoundEngine (updateSource|listener)
+javap net.minecraft.client.sounds.SoundManager updateSource
+grep audio/Listener
+javap com.mojang.blaze3d.audio.Listener
+javap com.mojang.blaze3d.audio.ListenerTransform
+javap net.minecraft.client.Options (fov|keyChat|keyCommand|hideGui|cameraType|keySprint)
+javap net.minecraft.client.MouseHandler (xpos|ypos|release|grab|isMouseGrabbed)
+javap net.minecraft.client.KeyMapping (matches|isDown|setDown|consumeClick|key)
+javap net.minecraft.client.gui.screens.ChatScreen <init>
+grep gui/screens/PauseScreen
+javap net.minecraft.client.Camera (position|getPosition|xRot|yRot|getLeft|getUp|forward)
+javap net.minecraft.client.renderer.GameRenderer (getFov|fov|Fov)
+javap net.minecraft.server.level.ServerPlayer (teleportTo|setCamera|setGameMode)
+javap com.mojang.blaze3d.platform.InputConstants (isKeyDown|KEY_ESCAPE|KEY_LEFT_ALT)
+src net.minecraft.client.sounds.SoundEngine updateSource|listener\.
+src net.minecraft.client.renderer.GameRenderer Fov|fov\(
+src net.minecraft.client.Minecraft pauseGame|openChatScreen
