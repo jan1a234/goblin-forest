@@ -1,11 +1,12 @@
-javap net.minecraft.client.gui.screens.ChatScreen
-javap net.minecraft.client.Camera (Fov|fov|isDetached|alignWithEntity|setup)
-src net.minecraft.client.sounds.SoundEngine
-src net.minecraft.client.Camera getFov|fov|alignWithEntity|setPosition|setRotation
-grep openChat|ChatComponent$
-src net.minecraft.client.Minecraft openChatScreen|ChatScreen|keyChat|handleKeybinds
-javap net.minecraft.client.gui.Gui (setScreen|screen\(\))
-javap net.minecraft.client.gui.GuiGraphicsExtractor (fill|outline|text|centeredText|item|blit|pose|enableScissor|disableScissor|setTooltip|tooltip)
-javap net.minecraft.client.gui.components.Button
-src net.minecraft.client.KeyboardHandler screen|KeyMapping\.set|click
-src net.minecraft.client.MouseHandler screen|grab|onButton|KeyMapping
+javap net.fabricmc.fabric.api.client.gametest.v1.TestInput
+javap net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext
+javap net.minecraft.client.gui.components.events.GuiEventListener (key|mouse|char)
+grep llamalad7/mixinextras/injector/wrapoperation/WrapOperation
+javap net.minecraft.client.Options keyHotbarSlots|keyPlayerList|keyDrop|keyJump|keyScreenshot|keyFullscreen|keyTogglePerspective|keyTogglePerspective|hideGui
+javap net.minecraft.client.KeyMapping (getTranslatedKeyMessage|isUnbound|same|getName|saveString)
+javap net.minecraft.world.item.Items (HANGING_ROOTS|LIGHTNING_ROD|MAGMA_BLOCK|FIRE_CHARGE|RED_MUSHROOM|REDSTONE|ANVIL|BLAZE_POWDER|GOLDEN_HELMET|RED_BANNER|GREEN_BANNER|DISPENSER|WRITABLE_BOOK|GOAT_HORN|IRON_SPEAR|WOODEN_AXE|BELL|COMPASS|TARGET|IRON_SWORD|SHIELD|BONE| BOW|MACE|BLAZE_ROD|GOLDEN_AXE)
+javap net.minecraft.client.Camera (Vector|vector|position)
+javap net.minecraft.client.particle.ParticleEngine add
+javap net.minecraft.client.multiplayer.ClientLevel addParticle
+javap net.minecraft.client.gui.Font (width|split|lineHeight)
+javap net.minecraft.client.gui.screens.PauseScreen
