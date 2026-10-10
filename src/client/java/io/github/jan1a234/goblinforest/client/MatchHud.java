@@ -121,7 +121,8 @@ public final class MatchHud {
 		drawResources(g, font, s);
 		drawCommandBar(g, font, s);
 		drawChieftainPanel(g, font, s);
-		if (!s.chieftainSent() && (phase == MatchPhase.COUNTDOWN || phase == MatchPhase.BATTLE)) {
+		// Erst nach dem „Kampf!“-Titel, sonst überdecken sich beide.
+		if (!s.chieftainSent() && phase == MatchPhase.BATTLE && s.matchSeconds() >= 3) {
 			drawStartHint(g, font);
 		}
 	}
