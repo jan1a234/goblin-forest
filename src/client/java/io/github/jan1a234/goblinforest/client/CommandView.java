@@ -25,7 +25,7 @@ import net.minecraft.world.phys.Vec3;
 public final class CommandView {
 	static final double MIN_DISTANCE = 14;
 	static final double MAX_DISTANCE = 80;
-	private static final double DEFAULT_DISTANCE = 40;
+	private static final double DEFAULT_DISTANCE = 32;
 	private static final double ZOOM_STEP = 5;
 	/** Neigung nach unten in Grad. */
 	private static final float PITCH = 60.0F;

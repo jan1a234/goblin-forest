@@ -77,7 +77,7 @@
 	"team.goblinforest.green": "Grüner Clan",
 	"title.goblinforest.countdown": "Bereit machen!",
 	"title.goblinforest.fight": "Kampf!",
-	"title.goblinforest.fight_sub": "Schick Goblins und Häuptling mit der Leiste unten links in die Schlacht!",
+	"title.goblinforest.fight_sub": "Schick deine Goblins los!",
 	"title.goblinforest.victory": "Sieg!",
 	"title.goblinforest.defeat": "Niederlage",
 	"title.goblinforest.winner": "Der %s gewinnt",
@@ -310,5 +310,6 @@
 	"hud.goblinforest.start_hint": "Schick deinen Häuptling mit dem goldenen Helm unten links (oder %s) los",
 	"hud.goblinforest.start_hint.camera": "Kamera: W/A/S/D oder Feld ziehen · Zoom: Mausrad oder +/-",
 	"menu.goblinforest.chieftain.send": "Häuptling losschicken%s",
-	"menu.goblinforest.chieftain.recall": "Häuptling zurückrufen%s"
+	"menu.goblinforest.chieftain.recall": "Häuptling zurückrufen%s",
+	"hud.goblinforest.slot.level": "Stufe %s"
 }

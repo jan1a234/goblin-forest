@@ -376,8 +376,8 @@ public final class MatchHud {
 		}
 		List<Component> tip = new ArrayList<>();
 		MutableComponent title = Component.translatable(spell.translationKey()).withStyle(ChatFormatting.GOLD);
-		if (entry != null && entry.level() > 0) {
-			title.append(Component.literal(" +" + entry.level()).withStyle(ChatFormatting.YELLOW));
+		if (entry != null && entry.level() > 1) {
+			title.append(Component.literal(" ").append(Component.translatable("hud.goblinforest.slot.level", entry.level())).withStyle(ChatFormatting.YELLOW));
 		}
 		tip.add(title);
 		tip.add(Component.translatable("menu.goblinforest.spell." + spell.id() + ".desc").withStyle(ChatFormatting.GRAY));
@@ -605,7 +605,8 @@ public final class MatchHud {
 		int cx = g.guiWidth() / 2;
 		int maxW = g.guiWidth() - 16;
 		int w = Math.min(maxW, Math.max(font.width(title), Math.max(font.width(text), font.width(camera))) + 12);
-		int y = g.guiHeight() / 2 - 20;
+		// Über der Befehlsleiste, damit Titel wie „Kampf!“ in der Bildmitte frei bleiben.
+		int y = Math.max(TOP_BAR_HEIGHT + 30, barTop - 44);
 		panel(g, cx - w / 2, y - 4, w, 37);
 		g.centeredText(font, title, cx, y, GOLD);
 		g.centeredText(font, fit(font, text.getString(), w - 8), cx, y + 11, TEXT);

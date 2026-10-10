@@ -77,7 +77,7 @@
 	"team.goblinforest.green": "Green Clan",
 	"title.goblinforest.countdown": "Get ready!",
 	"title.goblinforest.fight": "Fight!",
-	"title.goblinforest.fight_sub": "Send goblins and chieftain into battle with the bar at the bottom left!",
+	"title.goblinforest.fight_sub": "Send out your goblins!",
 	"title.goblinforest.victory": "Victory!",
 	"title.goblinforest.defeat": "Defeat",
 	"title.goblinforest.winner": "The %s wins",
@@ -310,5 +310,6 @@
 	"hud.goblinforest.start_hint": "Send your chieftain out with the golden helmet at the bottom left (or %s)",
 	"hud.goblinforest.start_hint.camera": "Camera: W/A/S/D or drag the field · Zoom: mouse wheel or +/-",
 	"menu.goblinforest.chieftain.send": "Send chieftain out%s",
-	"menu.goblinforest.chieftain.recall": "Call chieftain back%s"
+	"menu.goblinforest.chieftain.recall": "Call chieftain back%s",
+	"hud.goblinforest.slot.level": "level %s"
 }
